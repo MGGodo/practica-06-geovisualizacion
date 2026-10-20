@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Práctica 05 - Laboratorio Bioinformático de Cultivo</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧬</text></svg>">
+    <link rel="stylesheet" href="style.css">
+    <!-- Chart.js para analítica en tiempo real -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Import Map para Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <!-- PANEL IZQUIERDO: CONFIGURACIÓN BIOINFORMÁTICA Y PARÁMETROS -->
+    <aside id="controls-panel">
+        <div class="panel-header">
+            <h1>🧬 Lab Bioinformático P05</h1>
+            <span id="db-status" class="badge badge-warn">Conectando API...</span>
+        </div>
+
+        <div class="control-section">
+            <label for="species-select">Especie (Catálogo MySQL):</label>
+            <select id="species-select"></select>
+
+            <label for="model-select">Modelo Matemático de Crecimiento:</label>
+            <select id="model-select">
+                <option value="logistico">Logístico de Verhulst: dN/dt = r·N(1 - N/K)</option>
+                <option value="gompertz">Gompertz: N(t) = K·exp(-exp(-r(t - t₀)))</option>
+                <option value="exponencial">Exponencial: N(t) = N₀·e^(r·t)</option>
+                <option value="lineal">Lineal: N(t) = a·t + b</option>
+            </select>
+        </div>
+
+        <div class="control-section">
+            <h2>Parámetros Genéticos y Ambientales (Escenario A)</h2>
+            
+            <div class="slider-row">
+                <label>Tasa Intrínseca (r): <span id="val-r">0.140</span></label>
+                <input type="range" id="param-r" min="0.05" max="0.30" step="0.005" value="0.140">
+            </div>
+            <div class="slider-row">
+                <label>Capacidad Carga (K): <span id="val-k">4500</span> g</label>
+                <input type="range" id="param-k" min="500" max="8000" step="100" value="4500">
+            </div>
+            <div class="slider-row">
+                <label>☀️ Luz Solar: <span id="val-luz">85</span>%</label>
+                <input type="range" id="param-luz" min="10" max="100" step="1" value="85">
+            </div>
+            <div class="slider-row">
+                <label>💧 Agua / Humedad: <span id="val-agua">45</span>%</label>
+                <input type="range" id="param-agua" min="5" max="100" step="1" value="45">
+            </div>
+            <div class="slider-row">
+                <label>🌡️ Temperatura: <span id="val-temp">26</span> °C</label>
+                <input type="range" id="param-temp" min="5" max="45" step="0.5" value="26">
+            </div>
+            <div class="slider-row">
+                <label>🧪 Nutrientes (NPK): <span id="val-nut">75</span>%</label>
+                <input type="range" id="param-nut" min="10" max="100" step="1" value="75">
+            </div>
+            <div class="slider-row">
+                <label>🫧 CO₂ Atmosférico: <span id="val-co2">420</span> ppm</label>
+                <input type="range" id="param-co2" min="250" max="800" step="10" value="420">
+            </div>
+            <div class="slider-row">
+                <label>⏩ Velocidad Simulación: <span id="val-speed">1.5</span>x</label>
+                <input type="range" id="growth-speed" min="0.2" max="5" step="0.1" value="1.5">
+            </div>
+        </div>
+
+        <!-- ESCENARIO A/B PARALELO -->
+        <div class="control-section ab-box">
+            <div class="ab-header">
+                <label><input type="checkbox" id="toggle-ab"> ⚖️ Activar Comparativa A/B (Fila A vs Fila B)</label>
+            </div>
+            <div id="ab-controls" class="hidden">
+                <label for="species-b-select">Especie Escenario B (Fila Trasera):</label>
+                <select id="species-b-select"></select>
+
+                <label for="model-b-select">Modelo Escenario B (Fila Trasera):</label>
+                <select id="model-b-select">
+                    <option value="gompertz">Gompertz</option>
+                    <option value="logistico">Logístico de Verhulst</option>
+                    <option value="exponencial">Exponencial</option>
+                    <option value="lineal">Lineal</option>
+                </select>
+                <div class="slider-row">
+                    <label>💧 Agua Escenario B: <span id="val-agua-b">22</span>%</label>
+                    <input type="range" id="param-agua-b" min="5" max="100" step="1" value="22">
+                </div>
+                <div class="slider-row">
+                    <label>🌡️ Temp Escenario B: <span id="val-temp-b">32</span> °C</label>
+                    <input type="range" id="param-temp-b" min="5" max="45" step="0.5" value="32">
+                </div>
+            </div>
+        </div>
+
+        <div class="btn-grid">
+            <button id="btn-pause-growth">⏸️ Pausar</button>
+            <button id="btn-restart">🔄 Reiniciar</button>
+            <button id="btn-save-sim" class="btn-primary">💾 Guardar en MySQL</button>
+            <button id="btn-reports" class="btn-accent">📊 Reportes / Historial</button>
+            <button id="btn-export-csv" class="btn-secondary">📥 Exportar CSV</button>
+            <button id="btn-export-pdf" class="btn-secondary">🖨️ Reporte PDF</button>
+            <button id="btn-camera">Reiniciar Cámara</button>
+            <button id="btn-qa" class="btn-dark">Preguntas</button>
+        </div>
+    </aside>
+
+    <!-- PANEL DERECHO: TABLERO DE KPIs, MOTOR DE DECISIONES Y GRÁFICAS EN VIVO -->
+    <aside id="analytics-panel">
+        <h2>📈 Tablero de KPIs Biológicos</h2>
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <span class="kpi-label">Día Actual</span>
+                <strong id="kpi-day">0</strong>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Altura (m)</span>
+                <strong id="kpi-height">0.00</strong>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Biomasa (g)</span>
+                <strong id="kpi-biomass">0.0</strong>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Hojas / Tallos</span>
+                <strong id="kpi-leaves">0 / 1</strong>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">ICR (g/g·día)</span>
+                <strong id="kpi-icr">0.000</strong>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-label">Días a Cosecha</span>
+                <strong id="kpi-harvest">--</strong>
+            </div>
+        </div>
+
+        <!-- BARRAS DE ESTRÉS -->
+        <div class="stress-section">
+            <div class="stress-row">
+                <span>Estrés Hídrico: <b id="lbl-s-water">0%</b></span>
+                <div class="progress-bar"><div id="bar-s-water" class="progress-fill"></div></div>
+            </div>
+            <div class="stress-row">
+                <span>Estrés Térmico: <b id="lbl-s-temp">0%</b></span>
+                <div class="progress-bar"><div id="bar-s-temp" class="progress-fill"></div></div>
+            </div>
+            <div class="stress-row">
+                <span>Estrés Global: <b id="lbl-s-global">0%</b></span>
+                <div class="progress-bar"><div id="bar-s-global" class="progress-fill"></div></div>
+            </div>
+        </div>
+
+        <!-- MOTOR DE DECISIONES AGRONÓMICAS -->
+        <div id="decision-box" class="decision-ok">
+            <h3>🧠 Motor de Toma de Decisiones</h3>
+            <p id="decision-text">Iniciando monitoreo fisiológico...</p>
+            <p id="ab-winner-text" class="hidden"></p>
+        </div>
+
+        <!-- GRÁFICAS CHART.JS EN TIEMPO REAL -->
+        <div class="chart-container">
+            <canvas id="growthChart"></canvas>
+        </div>
+        <!-- GRÁFICAS CHART.JS EN TIEMPO REAL -->
+        <div class="chart-container">
+            <canvas id="growthChart"></canvas>
+        </div>
+
+        <!-- NUEVO: EXPLICACIÓN DINÁMICA DEL MODELO MATEMÁTICO -->
+        <div id="model-explanation-box">
+            <h4 id="model-exp-title">📐 Modelo Logístico de Verhulst</h4>
+            <p id="model-exp-desc">Crecimiento sigmoidal (curva en S) limitado por la capacidad de carga (K). Inicia lento en brote, acelera en fase juvenil y se desacelera al madurar la piña por competencia de recursos.</p>
+        </div>
+    </aside>
+
+    <!-- NUEVO: LÍNEA DEL TIEMPO DE 7 AÑOS (PARTE INFERIOR CENTRAL) -->
+    <div id="timeline-bar">
+        <div class="timeline-header">
+            <div>
+                <span class="timeline-title">⏳ Línea del Tiempo Agronómica (Ciclo Real Agave: 7 Años)</span>
+                <span id="timeline-current-year" class="badge badge-ok">En curso: Año 1</span>
+            </div>
+            <span id="timeline-edit-status" class="timeline-hint">💡 Haz clic en una línea anual para editar o ver su clima guardado</span>
+        </div>
+
+        <div class="timeline-track-wrapper">
+            <div class="timeline-progress-bg">
+                <div id="timeline-progress-fill"></div>
+            </div>
+            <div id="timeline-nodes" class="timeline-nodes">
+                <!-- Los 7 nodos/líneas anuales se generan desde main.js -->
+            </div>
+        </div>
+
+        <div id="timeline-node-details" class="timeline-details">
+            <span id="tl-detail-text">Selecciona una línea del Año 1 al 7 para ajustar sus variables climáticas (☀️ Luz, 💧 Agua, 🌡️ Temp, 🧪 NPK, 🫧 CO₂) con los sliders de la izquierda.</span>
+            <button id="btn-tl-live" class="btn-small hidden">🔓 Volver a Modo en Vivo</button>
+        </div>
+    </div>
+    </aside>
+
+    <!-- PANEL DE INFORMACIÓN RAYCASTING (AL HACER CLIC EN LA PLANTA 3D) -->
+    <div id="info-panel" class="hidden">
+        <h2 id="info-name">Parte Seleccionada</h2>
+        <div class="info-body">
+            <p><strong>Especie:</strong> <span id="info-species">---</span></p>
+            <p><strong>Geometría:</strong> <span id="info-type">---</span></p>
+            <p><strong>Crecimiento actual:</strong> <span id="info-growth">0</span>%</p>
+            <p><strong>Estrés asociado:</strong> <span id="info-stress">0</span>%</p>
+            <p><strong>Contribución a Biomasa:</strong> <span id="info-biomass-part">0</span> g (<span id="info-biomass-pct">0</span>%)</p>
+            <p><strong>Estado Quiote:</strong> <span id="info-quiote-status">En desarrollo</span></p>
+            <p><strong>Descripción:</strong> <span id="info-desc">---</span></p>
+            <button id="btn-cut-quiote" class="btn-cut hidden">✂️ Cortar Quiote (Desquiote)</button>
+        </div>
+    </div>
+
+    <!-- MODAL DE GUARDADO EN MYSQL -->
+    <div id="save-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="max-width: 480px;">
+            <button class="btn-close" id="btn-close-save">✖</button>
+            <h2>💾 Guardar Simulación en MySQL</h2>
+            <div class="form-group">
+                <label>Nombre del Experimento:</label>
+                <input type="text" id="sim-name" placeholder="Ej. Ensayo Logístico Agave Azul Altos">
+            </div>
+            <div class="form-group">
+                <label>Notas Agronómicas / Observaciones:</label>
+                <textarea id="sim-notes" rows="3" placeholder="Anota conclusiones sobre el rendimiento o estrés observado..."></textarea>
+            </div>
+            <button id="btn-confirm-save" class="btn-primary" style="width:100%; margin-top:10px;">Guardar Registro en Base de Datos</button>
+        </div>
+    </div>
+
+    <!-- MODAL DE REPORTES, RANKING E HISTORIAL (DESDE MYSQL) -->
+    <div id="reports-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <button class="btn-close" id="btn-close-reports">✖</button>
+            <h2>📊 Reportes Analíticos e Historial MySQL</h2>
+            <div class="modal-scroll">
+                <div class="report-summary" id="report-kpis"></div>
+
+                <h3>🏆 Top 5 Simulaciones por Biomasa Acumulada</h3>
+                <table class="data-table" id="table-top5">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Experimento</th>
+                            <th>Especie</th>
+                            <th>Modelo</th>
+                            <th>Biomasa (g)</th>
+                            <th>Altura (m)</th>
+                            <th>Estrés (%)</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+
+                <h3>🌿 Eficiencia por Especie y Tiempo Promedio a Madurez</h3>
+                <table class="data-table" id="table-efficiency">
+                    <thead>
+                        <tr>
+                            <th>Especie</th>
+                            <th>Corridas</th>
+                            <th>Biomasa Promedio (g)</th>
+                            <th>Eficiencia (g/día)</th>
+                            <th>Tiempo Promedio Madurez</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+
+                <h3>🕒 Historial de Simulaciones (Cargar y Reproducir)</h3>
+                <table class="data-table" id="table-history">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Nombre</th>
+                            <th>Especie</th>
+                            <th>Modelo</th>
+                            <th>Biomasa</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DEL CUESTIONARIO (14 PREGUNTAS PRÁCTICA 05) -->
+    <div id="qa-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <button class="btn-close" id="btn-close-qa">✖</button>
+            <h2>Preguntas</h2>
+            <div class="modal-scroll qa-scroll">
+                <h3>1. ¿Qué modelo ecológico o botánico representa tu simulador y por qué es relevante en bioinformática?</h3>
+                <p>Representa un Laboratorio Bioinformático de Cultivo enfocado en el género <i>Agave</i> (<i>A. tequilana</i>, <i>A. angustifolia</i>, <i>A. salmiana</i>) y organismos de referencia como <i>Arabidopsis thaliana</i>. Es relevante en bioinformática y biología computacional porque permite modelar in silico la interacción genotipo-ambiente (parámetros intrínsecos <i>r</i> y <i>K</i> frente a variables climáticas), predecir acumulación de biomasa de inulina y anticipar estrés fisiológico sin esperar los años que toma un ensayo real en campo.</p>
+
+                <h3>2. ¿Cómo diseñaste el esquema de la base de datos MySQL? Explica la función de cada tabla y las relaciones.</h3>
+                <p>Se diseñó la base <code>practica05_bioinformatica</code> en tercera forma normal con 4 tablas relacionales InnoDB:
+                1) <code>especies</code>: catálogo maestro con parámetros óptimos de temperatura, agua, luz, NPK, CO₂, tasa <i>r</i> y capacidad <i>K</i>.
+                2) <code>simulaciones</code>: almacena la configuración y KPIs finales de cada corrida, relacionada muchos-a-uno (FK <code>especie_id</code>) con <code>especies</code>.
+                3) <code>mediciones</code>: serie temporal que registra cada N ticks la altura, biomasa, hojas, ICR y estrés (FK <code>simulacion_id</code>).
+                4) <code>decisiones</code>: bitácora de auditoría con las alertas y recomendaciones emitidas por el motor (FK <code>simulacion_id</code>).</p>
+
+                <h3>3. ¿Cómo implementaste la API REST con FlightPHP? Menciona al menos 3 rutas y su propósito.</h3>
+                <p>Se implementó en <code>api/index.php</code> utilizando el enrutador declarativo de FlightPHP (<code>Flight::route</code> y <code>Flight::json</code>). Sus rutas principales son:
+                • <code>GET /especies</code>: consulta y retorna en JSON el catálogo biológico para poblar el selector del frontend.
+                • <code>POST /simulaciones</code>: recibe el payload JSON de la corrida y ejecuta una transacción PDO que inserta la simulación, sus mediciones por tick y las decisiones asociadas.
+                • <code>GET /reportes</code>: ejecuta consultas agregadas (<code>AVG</code>, <code>MAX</code>, <code>GROUP BY</code>) para obtener el Top 5 por biomasa, la especie más eficiente y el tiempo promedio a madurez.</p>
+
+                <h3>4. ¿Cómo conectaste Three.js con MySQL a través de PHP? Describe el flujo frontend → fetch → FlightPHP → PDO → MySQL → JSON → frontend.</h3>
+                <p>El ciclo inicia en <code>main.js</code> invocando funciones asíncronas con <code>fetch()</code> y <code>async/await</code>. La petición HTTP llega a <code>api/index.php</code> donde FlightPHP identifica la ruta y el verbo HTTP. El controlador invoca la clase <code>Database::getConnection()</code> que usa <code>PDO</code> para ejecutar sentencias preparadas sobre MySQL. MySQL devuelve las filas, FlightPHP las serializa con <code>Flight::json()</code> y el frontend recibe el JSON para actualizar la geometría 3D en Three.js, las tablas y las gráficas de Chart.js.</p>
+
+                <h3>5. ¿Qué modelo matemático de crecimiento usaste (lineal, exponencial, logístico, Gompertz) y cómo lo traduciste a código y a la escala visual de la planta?</h3>
+                <p>Se implementaron los 4 modelos seleccionables en tiempo real, destacando el Logístico de Verhulst <code>N(t) = K / (1 + ((K - N₀)/N₀) * e^(-r_ef * t))</code> y Gompertz <code>N(t) = K * exp(-exp(-r_ef * (t - t₀)))</code>. En código, la biomasa calculada <code>N(t)</code> se normaliza dividiéndola entre la capacidad de carga <code>K</code> (fracción <code>f = N(t)/K</code> de 0.001 a 1.0). Esa fracción controla la emergencia subterránea y la propiedad <code>.scale</code> de la piña, el grupo de pencas y el quiote en Three.js.</p>
+
+                <h3>6. ¿Cómo calculaste los índices de estrés y cómo afectan al crecimiento simulado?</h3>
+                <p>Cada índice de estrés (hídrico, térmico, lumínico y nutricional) se calcula midiendo la desviación absoluta entre el valor actual del slider y el valor óptimo de la especie en MySQL, normalizado en una escala de 0 a 100. El estrés global pondera estos factores (40% agua, 30% temperatura, 15% luz, 15% nutrientes) y penaliza directamente la tasa efectiva de crecimiento <code>r_ef = r * (1 - estresGlobal / 120)</code>, además de interpolar el color 3D de las pencas hacia un tono rojizo marchito usando <code>.lerp()</code>.</p>
+
+                <h3>7. ¿En qué consiste tu motor de decisiones? Da un ejemplo de regla, su umbral y la recomendación que emite.</h3>
+                <p>Es un sistema basado en reglas heurísticas que evalúa en cada tick los indicadores fisiológicos. Ejemplo de regla: Si el <code>estresHidrico > 35%</code> (con agua por debajo del óptimo de la especie), el motor activa una alerta roja ("Déficit Hídrico Crítico"), emite la recomendación <i>"Aumentar riego (+% humedad) para evitar cierre estomático y detención de biomasa"</i> y la registra para persistencia en la tabla <code>decisiones</code>.</p>
+
+                <h3>8. ¿Cómo implementaste la comparación A/B y qué métricas usaste para declarar un "ganador"?</h3>
+                <p>Al activar el modo A/B, el cultivo 3D se divide en dos parcelas: la Fila Frontal (Agaves 1-3) corre el Escenario A y la Fila Trasera (Agaves 4-6) corre el Escenario B en paralelo. Se evalúa un puntaje compuesto basado en mayor Biomasa Acumulada (g), menor Índice de Estrés Promedio (%) y mejor Eficiencia Hídrica, declarando en vivo en el panel y en Chart.js qué configuración agronómica es la ganadora.</p>
+
+                <h3>9. ¿Qué gráficas generaste y para qué sirven en el análisis? (Chart.js, CSV, PDF).</h3>
+                <p>Con Chart.js se generó un gráfico dinámico multivariable que traza la curva de Biomasa del Escenario A, la curva del Escenario B y la evolución del Estrés Global a lo largo de los días simulados. Además, se incluyó exportación directa de la serie temporal a archivo <code>.CSV</code> para análisis en Excel/R y generación de reporte imprimible en <code>PDF</code>.</p>
+
+                <h3>10. ¿Cómo evitaste SQL Injection y qué otras medidas de seguridad aplicaste en la API?</h3>
+                <p>Se utilizó exclusivamente PDO con sentencias preparadas nativas (<code>PDO::ATTR_EMULATE_PREPARES => false</code>) y parámetros vinculados (<code>?</code>), impidiendo que entradas maliciosas alteren la sintaxis SQL. Adicionalmente, se sanitizaron cadenas con <code>strip_tags()</code> y <code>htmlspecialchars()</code>, se validaron enteros con <code>filter_var()</code> y se manejaron transacciones atómicas (<code>beginTransaction / rollBack</code>).</p>
+
+                <h3>11. ¿Qué parte del proyecto fue la más difícil y cómo la resolviste?</h3>
+                <p>Sincronizar el bucle de 60 FPS de Three.js con el registro de datos sin saturar MySQL ni congelar la interfaz. Se resolvió desacoplando los frames visuales de los "días biológicos" (ticks) y almacenando mediciones únicamente cada 5 días simulados en un arreglo en memoria que se envía en una sola transacción <code>POST</code> al guardar.</p>
+
+                <h3>12. ¿Qué decisiones agronómicas o biológicas concretas puede apoyar tu simulador?</h3>
+                <p>Permite decidir qué especie de agave sembrar según el clima local, determinar el momento exacto de riego antes de perder tasa de crecimiento, elegir si conviene realizar el desquiote y estimar cuántos días faltan para alcanzar la madurez óptima de cosecha.</p>
+
+                <h3>13. Si tuvieras que llevar este proyecto a un sistema real de investigación, ¿qué agregarías?</h3>
+                <p>Integraría sensores IoT en campo (humedad capacitiva de suelo, estaciones meteorológicas MQTT) para alimentar la API en tiempo real, datos de secuenciación transcriptómica (RNA-seq) para correlacionar expresión de genes de estrés con las curvas de Gompertz, y controladores PID automatizados para electroválvulas de riego por goteo.</p>
+
+                <h3>14. ¿Cómo escalarías la aplicación para manejar cientos de simulaciones y usuarios concurrentes?</h3>
+                <p>Agregando índices compuestos en MySQL (como <code>idx_sim_tick</code> ya incluido en <code>mediciones</code>), implementando caché en memoria con Redis para el catálogo y reportes frecuentes, colas de mensajes (RabbitMQ) para procesar inserciones masivas de telemetría en segundo plano y paginación en los endpoints de la API.</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
