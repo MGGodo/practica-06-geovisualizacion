@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Práctica 05 - Laboratorio Bioinformático de Cultivo</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧬</text></svg>">
-    <link rel="stylesheet" href="style.css">
-    <!-- Chart.js para analítica en tiempo real -->
+    <link rel="stylesheet" href="style.css?v=3">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Import Map para Three.js -->
     <script type="importmap">
         {
             "imports": {
@@ -19,7 +17,7 @@
     </script>
 </head>
 <body>
-    <!-- PANEL IZQUIERDO: CONFIGURACIÓN BIOINFORMÁTICA Y PARÁMETROS -->
+    <!-- PANEL IZQUIERDO -->
     <aside id="controls-panel">
         <div class="panel-header">
             <h1>🧬 Lab Bioinformático P05</h1>
@@ -115,7 +113,7 @@
         </div>
     </aside>
 
-    <!-- PANEL DERECHO: TABLERO DE KPIs, MOTOR DE DECISIONES Y GRÁFICAS EN VIVO -->
+    <!-- PANEL DERECHO -->
     <aside id="analytics-panel">
         <h2>📈 Tablero de KPIs Biológicos</h2>
         <div class="kpi-grid">
@@ -145,7 +143,6 @@
             </div>
         </div>
 
-        <!-- BARRAS DE ESTRÉS -->
         <div class="stress-section">
             <div class="stress-row">
                 <span>Estrés Hídrico: <b id="lbl-s-water">0%</b></span>
@@ -161,30 +158,23 @@
             </div>
         </div>
 
-        <!-- MOTOR DE DECISIONES AGRONÓMICAS -->
         <div id="decision-box" class="decision-ok">
             <h3>🧠 Motor de Toma de Decisiones</h3>
             <p id="decision-text">Iniciando monitoreo fisiológico...</p>
             <p id="ab-winner-text" class="hidden"></p>
         </div>
 
-        <!-- GRÁFICAS CHART.JS EN TIEMPO REAL -->
-        <div class="chart-container">
-            <canvas id="growthChart"></canvas>
-        </div>
-        <!-- GRÁFICAS CHART.JS EN TIEMPO REAL -->
         <div class="chart-container">
             <canvas id="growthChart"></canvas>
         </div>
 
-        <!-- NUEVO: EXPLICACIÓN DINÁMICA DEL MODELO MATEMÁTICO -->
         <div id="model-explanation-box">
             <h4 id="model-exp-title">📐 Modelo Logístico de Verhulst</h4>
             <p id="model-exp-desc">Crecimiento sigmoidal (curva en S) limitado por la capacidad de carga (K). Inicia lento en brote, acelera en fase juvenil y se desacelera al madurar la piña por competencia de recursos.</p>
         </div>
     </aside>
 
-    <!-- NUEVO: LÍNEA DEL TIEMPO DE 7 AÑOS (PARTE INFERIOR CENTRAL) -->
+    <!-- LÍNEA DEL TIEMPO DE 7 AÑOS (PARTE INFERIOR CENTRAL) -->
     <div id="timeline-bar">
         <div class="timeline-header">
             <div>
@@ -198,9 +188,7 @@
             <div class="timeline-progress-bg">
                 <div id="timeline-progress-fill"></div>
             </div>
-            <div id="timeline-nodes" class="timeline-nodes">
-                <!-- Los 7 nodos/líneas anuales se generan desde main.js -->
-            </div>
+            <div id="timeline-nodes" class="timeline-nodes"></div>
         </div>
 
         <div id="timeline-node-details" class="timeline-details">
@@ -208,9 +196,8 @@
             <button id="btn-tl-live" class="btn-small hidden">🔓 Volver a Modo en Vivo</button>
         </div>
     </div>
-    </aside>
 
-    <!-- PANEL DE INFORMACIÓN RAYCASTING (AL HACER CLIC EN LA PLANTA 3D) -->
+    <!-- PANEL DE INFORMACIÓN RAYCASTING -->
     <div id="info-panel" class="hidden">
         <h2 id="info-name">Parte Seleccionada</h2>
         <div class="info-body">
@@ -242,7 +229,7 @@
         </div>
     </div>
 
-    <!-- MODAL DE REPORTES, RANKING E HISTORIAL (DESDE MYSQL) -->
+    <!-- MODAL DE REPORTES -->
     <div id="reports-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="btn-close" id="btn-close-reports">✖</button>
@@ -298,14 +285,14 @@
         </div>
     </div>
 
-    <!-- MODAL DEL CUESTIONARIO (14 PREGUNTAS PRÁCTICA 05) -->
+    <!-- MODAL DEL CUESTIONARIO -->
     <div id="qa-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="btn-close" id="btn-close-qa">✖</button>
             <h2>Preguntas</h2>
             <div class="modal-scroll qa-scroll">
                 <h3>1. ¿Qué modelo ecológico o botánico representa tu simulador y por qué es relevante en bioinformática?</h3>
-                <p>Representa un Laboratorio Bioinformático de Cultivo enfocado en el género <i>Agave</i> (<i>A. tequilana</i>, <i>A. angustifolia</i>, <i>A. salmiana</i>) y organismos de referencia como <i>Arabidopsis thaliana</i>. Es relevante en bioinformática y biología computacional porque permite modelar in silico la interacción genotipo-ambiente (parámetros intrínsecos <i>r</i> y <i>K</i> frente a variables climáticas), predecir acumulación de biomasa de inulina y anticipar estrés fisiológico sin esperar los años que toma un ensayo real en campo.</p>
+                <p>Representa un Laboratorio Bioinformático de Cultivo enfocado en el género <i>Agave</i> (<i>A. tequilana</i>, <i>A. angustifolia</i>, <i>A. salmiana</i>) y organismos de referencia como <i>Arabidopsis thaliana</i>. Es relevante en bioinformática y biología computacional porque permite modelar in silico la interacción genotipo-ambiente (parámetros intrínsecos <i>r</i> y <i>K</i> frente a variables climáticas), predecir acumulación de biomasa de inulina y anticipar estrés fisiológico sin esperar los 7 años que toma un ensayo real en campo.</p>
 
                 <h3>2. ¿Cómo diseñaste el esquema de la base de datos MySQL? Explica la función de cada tabla y las relaciones.</h3>
                 <p>Se diseñó la base <code>practica05_bioinformatica</code> en tercera forma normal con 4 tablas relacionales InnoDB:
@@ -324,28 +311,28 @@
                 <p>El ciclo inicia en <code>main.js</code> invocando funciones asíncronas con <code>fetch()</code> y <code>async/await</code>. La petición HTTP llega a <code>api/index.php</code> donde FlightPHP identifica la ruta y el verbo HTTP. El controlador invoca la clase <code>Database::getConnection()</code> que usa <code>PDO</code> para ejecutar sentencias preparadas sobre MySQL. MySQL devuelve las filas, FlightPHP las serializa con <code>Flight::json()</code> y el frontend recibe el JSON para actualizar la geometría 3D en Three.js, las tablas y las gráficas de Chart.js.</p>
 
                 <h3>5. ¿Qué modelo matemático de crecimiento usaste (lineal, exponencial, logístico, Gompertz) y cómo lo traduciste a código y a la escala visual de la planta?</h3>
-                <p>Se implementaron los 4 modelos seleccionables en tiempo real, destacando el Logístico de Verhulst <code>N(t) = K / (1 + ((K - N₀)/N₀) * e^(-r_ef * t))</code> y Gompertz <code>N(t) = K * exp(-exp(-r_ef * (t - t₀)))</code>. En código, la biomasa calculada <code>N(t)</code> se normaliza dividiéndola entre la capacidad de carga <code>K</code> (fracción <code>f = N(t)/K</code> de 0.001 a 1.0). Esa fracción controla la emergencia subterránea y la propiedad <code>.scale</code> de la piña, el grupo de pencas y el quiote en Three.js.</p>
+                <p>Se implementaron los 4 modelos seleccionables en tiempo real mediante integración paso a paso a lo largo de la línea del tiempo de 7 años, destacando el Logístico de Verhulst <code>dN/dt = r·N(1 - N/K)</code> y Gompertz. En código, la biomasa calculada <code>N(t)</code> se normaliza dividiéndola entre la capacidad de carga <code>K</code> (fracción <code>f = N(t)/K</code> de 0.001 a 1.0). Esa fracción controla la propiedad <code>.scale</code> de la piña, el grupo de pencas y el quiote en Three.js.</p>
 
                 <h3>6. ¿Cómo calculaste los índices de estrés y cómo afectan al crecimiento simulado?</h3>
-                <p>Cada índice de estrés (hídrico, térmico, lumínico y nutricional) se calcula midiendo la desviación absoluta entre el valor actual del slider y el valor óptimo de la especie en MySQL, normalizado en una escala de 0 a 100. El estrés global pondera estos factores (40% agua, 30% temperatura, 15% luz, 15% nutrientes) y penaliza directamente la tasa efectiva de crecimiento <code>r_ef = r * (1 - estresGlobal / 120)</code>, además de interpolar el color 3D de las pencas hacia un tono rojizo marchito usando <code>.lerp()</code>.</p>
+                <p>Cada índice de estrés (hídrico, térmico, lumínico y nutricional) se calcula midiendo la desviación absoluta entre el valor actual del año en la línea del tiempo y el valor óptimo de la especie en MySQL, normalizado de 0 a 100. El estrés global pondera estos factores y penaliza la tasa efectiva <code>r_ef</code>. Si el estrés supera umbrales letales (ej. agua ≤ 8% o estrés global ≥ 78%), la planta entra en Punto de Marchitez Permanente (muerte irreversible), perdiendo biomasa y tiñéndose de color café seco.</p>
 
                 <h3>7. ¿En qué consiste tu motor de decisiones? Da un ejemplo de regla, su umbral y la recomendación que emite.</h3>
-                <p>Es un sistema basado en reglas heurísticas que evalúa en cada tick los indicadores fisiológicos. Ejemplo de regla: Si el <code>estresHidrico > 35%</code> (con agua por debajo del óptimo de la especie), el motor activa una alerta roja ("Déficit Hídrico Crítico"), emite la recomendación <i>"Aumentar riego (+% humedad) para evitar cierre estomático y detención de biomasa"</i> y la registra para persistencia en la tabla <code>decisiones</code>.</p>
+                <p>Es un sistema basado en reglas heurísticas que evalúa en cada tick los indicadores fisiológicos. Ejemplo de regla: Si el <code>estresHidrico > 35%</code> (con agua por debajo del óptimo de la especie), el motor activa una alerta roja ("Déficit Hídrico Crítico"), emite la recomendación <i>"Aumentar riego para evitar cierre estomático y muerte por desecación"</i> y la registra para persistencia en la tabla <code>decisiones</code>.</p>
 
                 <h3>8. ¿Cómo implementaste la comparación A/B y qué métricas usaste para declarar un "ganador"?</h3>
-                <p>Al activar el modo A/B, el cultivo 3D se divide en dos parcelas: la Fila Frontal (Agaves 1-3) corre el Escenario A y la Fila Trasera (Agaves 4-6) corre el Escenario B en paralelo. Se evalúa un puntaje compuesto basado en mayor Biomasa Acumulada (g), menor Índice de Estrés Promedio (%) y mejor Eficiencia Hídrica, declarando en vivo en el panel y en Chart.js qué configuración agronómica es la ganadora.</p>
+                <p>Al activar el modo A/B, el cultivo 3D se divide en dos parcelas: la Fila Frontal (Agaves 1-3) corre el Escenario A y la Fila Trasera (Agaves 4-6) corre el Escenario B en paralelo (permitiendo elegir tanto otra especie como otro modelo y clima). Se evalúa mayor Biomasa Acumulada (g) y menor Índice de Estrés Global (%), declarando en vivo en el panel y en Chart.js qué configuración agronómica es la ganadora.</p>
 
                 <h3>9. ¿Qué gráficas generaste y para qué sirven en el análisis? (Chart.js, CSV, PDF).</h3>
-                <p>Con Chart.js se generó un gráfico dinámico multivariable que traza la curva de Biomasa del Escenario A, la curva del Escenario B y la evolución del Estrés Global a lo largo de los días simulados. Además, se incluyó exportación directa de la serie temporal a archivo <code>.CSV</code> para análisis en Excel/R y generación de reporte imprimible en <code>PDF</code>.</p>
+                <p>Con Chart.js se generó un gráfico dinámico multivariable que traza la curva de Biomasa del Escenario A, la curva del Escenario B y la evolución del Estrés Global a lo largo de los 7 años (2,555 días). Además, se incluyó exportación directa de la serie temporal a archivo <code>.CSV</code> y generación de reporte imprimible en <code>PDF</code>.</p>
 
                 <h3>10. ¿Cómo evitaste SQL Injection y qué otras medidas de seguridad aplicaste en la API?</h3>
                 <p>Se utilizó exclusivamente PDO con sentencias preparadas nativas (<code>PDO::ATTR_EMULATE_PREPARES => false</code>) y parámetros vinculados (<code>?</code>), impidiendo que entradas maliciosas alteren la sintaxis SQL. Adicionalmente, se sanitizaron cadenas con <code>strip_tags()</code> y <code>htmlspecialchars()</code>, se validaron enteros con <code>filter_var()</code> y se manejaron transacciones atómicas (<code>beginTransaction / rollBack</code>).</p>
 
                 <h3>11. ¿Qué parte del proyecto fue la más difícil y cómo la resolviste?</h3>
-                <p>Sincronizar el bucle de 60 FPS de Three.js con el registro de datos sin saturar MySQL ni congelar la interfaz. Se resolvió desacoplando los frames visuales de los "días biológicos" (ticks) y almacenando mediciones únicamente cada 5 días simulados en un arreglo en memoria que se envía en una sola transacción <code>POST</code> al guardar.</p>
+                <p>Sincronizar el bucle de 60 FPS de Three.js con la línea del tiempo de 7 años y el registro de datos sin saturar MySQL ni causar saltos abruptos al cambiar el clima. Se resolvió integrando las ecuaciones diferenciales paso a paso por año y almacenando mediciones cada 5 ticks en un arreglo en memoria que se envía en una sola transacción <code>POST</code> al guardar.</p>
 
                 <h3>12. ¿Qué decisiones agronómicas o biológicas concretas puede apoyar tu simulador?</h3>
-                <p>Permite decidir qué especie de agave sembrar según el clima local, determinar el momento exacto de riego antes de perder tasa de crecimiento, elegir si conviene realizar el desquiote y estimar cuántos días faltan para alcanzar la madurez óptima de cosecha.</p>
+                <p>Permite decidir qué especie de agave sembrar según el clima local, determinar el momento exacto de riego en cada año del ciclo, ejecutar el desquiote (corte del quiote floral) en plantas individuales para engordar la piña (+12% biomasa) y estimar cuántos días reales faltan para la jima.</p>
 
                 <h3>13. Si tuvieras que llevar este proyecto a un sistema real de investigación, ¿qué agregarías?</h3>
                 <p>Integraría sensores IoT en campo (humedad capacitiva de suelo, estaciones meteorológicas MQTT) para alimentar la API en tiempo real, datos de secuenciación transcriptómica (RNA-seq) para correlacionar expresión de genes de estrés con las curvas de Gompertz, y controladores PID automatizados para electroválvulas de riego por goteo.</p>
@@ -356,6 +343,6 @@
         </div>
     </div>
 
-    <script type="module" src="main.js"></script>
+    <script type="module" src="main.js?v=3"></script>
 </body>
 </html>

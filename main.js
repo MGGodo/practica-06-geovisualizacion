@@ -5,9 +5,6 @@ const API_BASE = window.location.port === '5500'
     ? 'http://localhost/git/practica-05-bioinformatica/api/index.php?route='
     : './api/index.php?route=';
 
-// ==========================================
-// 1. CATÁLOGO, MORFOLOGÍA Y EXPLICACIONES DE MODELOS
-// ==========================================
 let catalogoEspecies = [
     { id: 1, nombre_cientifico: 'Agave tequilana Weber', nombre_comun: 'Agave Azul (Tequilero)', tasa_r_base: 0.140, capacidad_k_base: 4500, altura_max_m: 3.8, luz_optima: 85, agua_optima: 45, temp_optima: 26, nutrientes_optimos: 75, co2_optimo: 420, dias_madurez: 100, color_hex: '#4a858c' },
     { id: 2, nombre_cientifico: 'Agave angustifolia Haw', nombre_comun: 'Agave Espadín (Mezcalero)', tasa_r_base: 0.165, capacidad_k_base: 5200, altura_max_m: 4.2, luz_optima: 80, agua_optima: 40, temp_optima: 28, nutrientes_optimos: 70, co2_optimo: 415, dias_madurez: 95, color_hex: '#5c9c54' },
@@ -45,20 +42,17 @@ const EXPLICACIONES_MODELOS = {
 
 let especieActual = catalogoEspecies[0];
 let especieB = catalogoEspecies[2];
-let currentDay = 0; // 0 a 140 ticks internos -> equivale a 0 a 2555 días reales (7 años)
+let currentDay = 0;
 let lastRecordedTick = -1;
 let isGrowing = true;
 let simSpeed = 1.5;
 let abModeActive = false;
 
-// ==========================================
-// 2. ESTADO DE LA LÍNEA DEL TIEMPO (7 AÑOS = 2555 DÍAS)
-// ==========================================
 const TOTAL_ANIOS = 7;
-const TICKS_POR_ANIO = 20; // 140 ticks totales
+const TICKS_POR_ANIO = 20;
 const DIAS_REALES_POR_ANIO = 365;
 const DIAS_REALES_TOTALES = TOTAL_ANIOS * DIAS_REALES_POR_ANIO; // 2555 días
-const FACTOR_DIAS_REALES = DIAS_REALES_TOTALES / 140; // 18.25 días reales por tick
+const FACTOR_DIAS_REALES = DIAS_REALES_TOTALES / 140;
 
 let anioSeleccionadoParaEdicion = null;
 let timelineAnios = [];
@@ -168,8 +162,6 @@ function seleccionarAnioTimeline(anioNum) {
     renderizarNodosTimeline();
 }
 
-// Guarda el cambio del slider en el año activo y lo propaga a los años siguientes no editados
-// para que no se restablezca solo al cambiar de año
 function guardarSlidersEnAnioActivo() {
     const anioObjetivo = anioSeleccionadoParaEdicion !== null
         ? anioSeleccionadoParaEdicion
@@ -182,7 +174,6 @@ function guardarSlidersEnAnioActivo() {
     const nuevoCo2 = parseFloat(document.getElementById('param-co2').value);
 
     for (let i = anioObjetivo - 1; i < TOTAL_ANIOS; i++) {
-        // Actualiza el año objetivo y propaga hacia adelante a los años que no hayan sido bloqueados manualmente después
         if (i === anioObjetivo - 1 || !timelineAnios[i].editadoManual) {
             timelineAnios[i].luz = nuevoLuz;
             timelineAnios[i].agua = nuevoAgua;
@@ -219,9 +210,6 @@ let ultimaAlertaEmitida = '';
 let estadoA = { biomasa: 10, altura: 0.1, hojas: 0, ramas: 1, icr: 0, estresHidrico: 0, estresTermico: 0, estresGlobal: 0, fraccion: 0.001, diasCosecha: 2555, muerta: false };
 let estadoB = { biomasa: 10, altura: 0.1, hojas: 0, ramas: 1, icr: 0, estresHidrico: 0, estresTermico: 0, estresGlobal: 0, fraccion: 0.001, muerta: false };
 
-// ==========================================
-// 3. ESCENA 3D THREE.JS (TERRENO Y CULTIVO 2x3)
-// ==========================================
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x87CEEB, 0.008);
 const colorDia = new THREE.Color(0x87CEEB);
@@ -305,9 +293,6 @@ const plantasEntorno = [];
     }
 })();
 
-// ==========================================
-// 4. GENERACIÓN DE AGAVES (CON SOPORTE DE DESQUIOTE INDIVIDUAL)
-// ==========================================
 const interactableObjects = [];
 const todosLosAgaves = [];
 
@@ -316,7 +301,7 @@ function crearAgave(posX, posZ, id, escenarioGrupo) {
     agaveGroup.position.set(posX, 0, posZ);
     agaveGroup.userData.idAgave = id;
     agaveGroup.userData.escenario = escenarioGrupo;
-    agaveGroup.userData.quioteCortado = false; // Controla si el usuario ya le cortó el quiote a esta planta
+    agaveGroup.userData.quioteCortado = false;
 
     const matPencas = new THREE.MeshStandardMaterial({ color: 0x4a858c, roughness: 0.65 });
     const matPina = new THREE.MeshStandardMaterial({ color: 0xdbd8a0, roughness: 0.9 });
@@ -455,9 +440,6 @@ function aplicarMorfologiaEspecie() {
     });
 }
 
-// ==========================================
-// 5. MOTOR MATEMÁTICO CON MORTALIDAD REAL POR ESTRÉS EXTREMO
-// ==========================================
 function simularCrecimientoAcumulado(configBase, diaObjetivo, especieRef, usarTimelineA = true) {
     const opt = especieRef;
     const K = configBase.k;
@@ -495,7 +477,6 @@ function simularCrecimientoAcumulado(configBase, diaObjetivo, especieRef, usarTi
             (estresNutricional * 0.10)
         );
 
-        // Condición letal: sequía extrema (<= 8% agua), helada/calor letal (<=6°C o >=43°C) o estrés global >= 78%
         const condicionLetal = (agua <= 8) || (agua >= 96) || (temp >= 43) || (temp <= 6) || (estresGlobal >= 78);
 
         if (condicionLetal) {
@@ -508,14 +489,12 @@ function simularCrecimientoAcumulado(configBase, diaObjetivo, especieRef, usarTi
         }
 
         if (plantaMuerta) {
-            // Una planta muerta pierde turgencia/biomasa por desecación y YA NO PUEDE REVIVIR en años posteriores
             biomasa = Math.max(N0 * 0.4, biomasa * 0.96);
             ultimaREf = 0;
             if (usarTimelineA && timelineAnios[anioIdx]) {
                 timelineAnios[anioIdx].plantaMuertaEnAnio = true;
             }
         } else if (estresGlobal >= 60) {
-            // Estrés severo sub-letal: detiene crecimiento y pierde un poco de peso foliar
             biomasa = Math.max(N0, biomasa * 0.99);
             ultimaREf = 0;
         } else {
@@ -555,7 +534,6 @@ function simularCrecimientoAcumulado(configBase, diaObjetivo, especieRef, usarTi
     const ramas = (!plantaMuerta && fraccion > 0.62) ? 2 : 1;
     const icr = plantaMuerta ? 0 : +(ultimaREf * (1 - biomasa / K)).toFixed(4);
 
-    // Días reales restantes para cosecha (base 2555 días para 7 años)
     const diasRealesTranscurridos = tickADiasReales(diaObjetivo);
     const penalizacionCosecha = Math.max(0.25, 1 - (ultimoEstresG / 130));
     const diasCosecha = plantaMuerta
@@ -577,9 +555,6 @@ function simularCrecimientoAcumulado(configBase, diaObjetivo, especieRef, usarTi
     };
 }
 
-// ==========================================
-// 6. MOTOR DE DECISIONES Y GRÁFICA CHART.JS
-// ==========================================
 const ctxChart = document.getElementById('growthChart').getContext('2d');
 const growthChart = new Chart(ctxChart, {
     type: 'line',
@@ -731,9 +706,6 @@ function evaluarMotorDecisiones(tickDia) {
     }
 }
 
-// ==========================================
-// 7. CONEXIÓN CON API REST (FLIGHTPHP + MYSQL)
-// ==========================================
 async function cargarCatalogoEspecies() {
     const statusBadge = document.getElementById('db-status');
     const selectA = document.getElementById('species-select');
@@ -919,9 +891,6 @@ async function cargarSimulacionHistorica(id) {
     }
 }
 
-// ==========================================
-// 8. RAYCASTING Y BOTÓN DE CORTE DE QUIOTE (DESQUIOTE)
-// ==========================================
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let selectedMesh = null;
@@ -938,7 +907,6 @@ function actualizarPanelRaycaster() {
     const est = esB ? estadoB : estadoA;
     const espInfo = esB ? especieB : especieActual;
 
-    // Si a esta planta se le cortó el quiote, su piña acumula +12% de biomasa de inulina
     const bonoDesquiote = (agave && agave.userData.quioteCortado) ? 1.12 : 1.0;
     const biomasaEfectivaPlanta = +(est.biomasa * bonoDesquiote).toFixed(1);
 
@@ -953,7 +921,6 @@ function actualizarPanelRaycaster() {
     document.getElementById('info-biomass-pct').innerText = Math.round(data.biomassShare * 100);
     document.getElementById('info-desc').innerText = data.desc;
 
-    // Estado del quiote y botón para cortarlo
     const statusQuioteEl = document.getElementById('info-quiote-status');
     const btnCut = document.getElementById('btn-cut-quiote');
     const quioteYaEmergio = est.fraccion > 0.62 && !est.muerta;
@@ -1014,9 +981,6 @@ window.addEventListener('pointerdown', (event) => {
     }
 });
 
-// ==========================================
-// 9. EVENTOS DE INTERFAZ Y LÍNEA DEL TIEMPO
-// ==========================================
 function bindSlider(id, labelId, esClimaTimeline = false) {
     const el = document.getElementById(id);
     const lbl = document.getElementById(labelId);
@@ -1157,9 +1121,6 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ==========================================
-// 10. BUCLE PRINCIPAL DE SIMULACIÓN Y ANIMACIÓN
-// ==========================================
 const clock = new THREE.Clock();
 let windClock = 0;
 let ultimoAnioMostrado = 1;
@@ -1246,7 +1207,6 @@ function animate() {
         const morf = MORFOLOGIA_ESPECIES[espAgave.id] || MORFOLOGIA_ESPECIES[1];
         const f = est.fraccion;
 
-        // Si se le cortó el quiote a esta planta, la piña engorda un 12% extra
         const bonoPinaDesquiote = agave.userData.quioteCortado ? 1.12 : 1.0;
 
         const sPina = Math.min(1.15, Math.max(0.001, f * 1.35)) * morf.porteGeneral * bonoPinaDesquiote;
@@ -1268,7 +1228,6 @@ function animate() {
             sQuiote * morf.quioteAncho
         );
 
-        // Color café seco si murió, o interpolación rojiza si tiene estrés
         const colorBaseEspecie = new THREE.Color(morf.colorHoja);
         const targetColor = est.muerta
             ? colorMuerto

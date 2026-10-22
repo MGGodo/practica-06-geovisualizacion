@@ -10,7 +10,6 @@ body {
     background-color: #87CEEB;
 }
 
-/* Paneles Laterales */
 #controls-panel, #analytics-panel {
     position: absolute;
     top: 12px;
@@ -104,7 +103,6 @@ select, input[type="text"], textarea {
     cursor: pointer;
 }
 
-/* Botones */
 .btn-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -130,7 +128,6 @@ button:active { transform: scale(0.98); }
 .btn-secondary { background: #34495e; }
 .btn-dark { background: #d35400; }
 
-/* KPIs */
 .kpi-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -151,11 +148,10 @@ button:active { transform: scale(0.98); }
     color: #94a3b8;
 }
 .kpi-card strong {
-    font-size: 0.98rem;
+    font-size: 0.95rem;
     color: #f1c40f;
 }
 
-/* Barras de Estrés */
 .stress-section {
     margin-bottom: 10px;
 }
@@ -178,7 +174,6 @@ button:active { transform: scale(0.98); }
     transition: width 0.3s, background 0.3s;
 }
 
-/* Motor de Decisiones */
 #decision-box {
     padding: 9px;
     border-radius: 8px;
@@ -215,118 +210,6 @@ button:active { transform: scale(0.98); }
     height: 195px;
 }
 
-/* Panel Raycasting */
-#info-panel {
-    position: absolute;
-    bottom: 16px;
-    left: 355px;
-    width: 310px;
-    background: rgba(20, 35, 45, 0.94);
-    border: 1px solid #f1c40f;
-    color: white;
-    padding: 14px;
-    border-radius: 10px;
-    z-index: 10;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    pointer-events: none;
-}
-#info-name {
-    font-size: 1.05rem;
-    color: #f1c40f;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-    padding-bottom: 6px;
-    margin-bottom: 8px;
-}
-.info-body p {
-    font-size: 0.82rem;
-    margin-bottom: 5px;
-}
-
-/* Modales */
-.modal-overlay {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
-    background: rgba(10, 20, 35, 0.85);
-    backdrop-filter: blur(6px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 100;
-}
-.hidden { display: none !important; }
-
-.modal-card {
-    background: linear-gradient(135deg, #1e352f, #12221d);
-    border: 2px solid #5a7d71;
-    border-radius: 14px;
-    width: 88%;
-    max-width: 900px;
-    max-height: 86vh;
-    padding: 22px;
-    color: #e2e8f0;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-}
-.modal-card h2 {
-    font-size: 1.35rem;
-    color: #dbd8a0;
-    margin-bottom: 14px;
-    border-bottom: 1px solid #5a7d71;
-    padding-bottom: 8px;
-}
-.btn-close {
-    position: absolute;
-    top: 16px; right: 18px;
-    background: #c0392b;
-    width: 32px; height: 32px;
-    border-radius: 50%;
-}
-.modal-scroll {
-    overflow-y: auto;
-    padding-right: 10px;
-}
-.qa-scroll h3 {
-    color: #82e0aa;
-    margin-top: 14px;
-    font-size: 0.98rem;
-}
-.qa-scroll p {
-    font-size: 0.88rem;
-    line-height: 1.45;
-    margin-top: 4px;
-    color: #cbd5e1;
-}
-
-/* Tablas de Reportes */
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 8px 0 18px 0;
-    font-size: 0.82rem;
-}
-.data-table th, .data-table td {
-    border: 1px solid rgba(255,255,255,0.15);
-    padding: 7px 9px;
-    text-align: left;
-}
-.data-table th {
-    background: rgba(90, 125, 113, 0.35);
-    color: #dbd8a0;
-}
-.report-summary {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 15px;
-}
-
-@media print {
-    canvas#three-canvas, #controls-panel { display: none !important; }
-    #analytics-panel { width: 100%; position: static; background: #fff; color: #000; }
-}
-
-/* Explicación del Modelo Matemático debajo de la gráfica */
 #model-explanation-box {
     margin-top: 8px;
     padding: 8px 10px;
@@ -418,10 +301,8 @@ button:active { transform: scale(0.98); }
     align-items: center;
     cursor: pointer;
     user-select: none;
-    group: true;
 }
 
-/* La línea vertical seleccionable de cada año */
 .tl-line {
     width: 6px;
     height: 24px;
@@ -480,13 +361,30 @@ button:active { transform: scale(0.98); }
     border-radius: 4px;
 }
 
-/* Ajuste para que el panel de raycasting quede arriba de la línea del tiempo */
 #info-panel {
-    bottom: 135px !important;
+    position: absolute;
+    bottom: 135px;
+    left: 355px;
+    width: 315px;
+    background: rgba(20, 35, 45, 0.94);
+    border: 1px solid #f1c40f;
+    color: white;
+    padding: 14px;
+    border-radius: 10px;
+    z-index: 10;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    pointer-events: auto;
 }
-
-#info-panel {
-    pointer-events: auto !important;
+#info-name {
+    font-size: 1.05rem;
+    color: #f1c40f;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+}
+.info-body p {
+    font-size: 0.82rem;
+    margin-bottom: 5px;
 }
 
 .btn-cut {
@@ -507,4 +405,86 @@ button:active { transform: scale(0.98); }
     background: #475569;
     border-color: #64748b;
     cursor: not-allowed;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(10, 20, 35, 0.85);
+    backdrop-filter: blur(6px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+.hidden { display: none !important; }
+
+.modal-card {
+    background: linear-gradient(135deg, #1e352f, #12221d);
+    border: 2px solid #5a7d71;
+    border-radius: 14px;
+    width: 88%;
+    max-width: 900px;
+    max-height: 86vh;
+    padding: 22px;
+    color: #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+.modal-card h2 {
+    font-size: 1.35rem;
+    color: #dbd8a0;
+    margin-bottom: 14px;
+    border-bottom: 1px solid #5a7d71;
+    padding-bottom: 8px;
+}
+.btn-close {
+    position: absolute;
+    top: 16px; right: 18px;
+    background: #c0392b;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+}
+.modal-scroll {
+    overflow-y: auto;
+    padding-right: 10px;
+}
+.qa-scroll h3 {
+    color: #82e0aa;
+    margin-top: 14px;
+    font-size: 0.98rem;
+}
+.qa-scroll p {
+    font-size: 0.88rem;
+    line-height: 1.45;
+    margin-top: 4px;
+    color: #cbd5e1;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0 18px 0;
+    font-size: 0.82rem;
+}
+.data-table th, .data-table td {
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 7px 9px;
+    text-align: left;
+}
+.data-table th {
+    background: rgba(90, 125, 113, 0.35);
+    color: #dbd8a0;
+}
+.report-summary {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 15px;
+}
+
+@media print {
+    canvas#three-canvas, #controls-panel, #timeline-bar { display: none !important; }
+    #analytics-panel { width: 100%; position: static; background: #fff; color: #000; }
 }
