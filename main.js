@@ -1,16 +1,16 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as AG from './js/agronomia.js';
+import { apiGet, apiPost } from './js/api.js';
+import { iniciarObservatorio } from './js/observatorio.js';
 
-const API_BASE = window.location.port === '5500'
-    ? 'http://localhost/git/practica-05-bioinformatica/api/index.php?route='
-    : './api/index.php?route=';
-
+// Catálogo de respaldo (si MySQL no responde). Los óptimos son el centro de la zona óptima de js/agronomia.js
 let catalogoEspecies = [
-    { id: 1, nombre_cientifico: 'Agave tequilana Weber', nombre_comun: 'Agave Azul (Tequilero)', tasa_r_base: 0.140, capacidad_k_base: 4500, altura_max_m: 3.8, luz_optima: 85, agua_optima: 45, temp_optima: 26, nutrientes_optimos: 75, co2_optimo: 420, dias_madurez: 100, color_hex: '#4a858c' },
-    { id: 2, nombre_cientifico: 'Agave angustifolia Haw', nombre_comun: 'Agave Espadín (Mezcalero)', tasa_r_base: 0.165, capacidad_k_base: 5200, altura_max_m: 4.2, luz_optima: 80, agua_optima: 40, temp_optima: 28, nutrientes_optimos: 70, co2_optimo: 415, dias_madurez: 95, color_hex: '#5c9c54' },
-    { id: 3, nombre_cientifico: 'Agave salmiana Otto', nombre_comun: 'Maguey Pulquero / Manso', tasa_r_base: 0.120, capacidad_k_base: 6800, altura_max_m: 4.8, luz_optima: 75, agua_optima: 55, temp_optima: 22, nutrientes_optimos: 85, co2_optimo: 430, dias_madurez: 120, color_hex: '#28593a' },
-    { id: 4, nombre_cientifico: 'Agave cupreata Trel', nombre_comun: 'Agave Papalote', tasa_r_base: 0.110, capacidad_k_base: 3800, altura_max_m: 3.1, luz_optima: 78, agua_optima: 50, temp_optima: 25, nutrientes_optimos: 80, co2_optimo: 420, dias_madurez: 110, color_hex: '#738c4a' },
-    { id: 5, nombre_cientifico: 'Arabidopsis thaliana', nombre_comun: 'Arabidopsis (Modelo Genético)', tasa_r_base: 0.250, capacidad_k_base: 850, altura_max_m: 1.2, luz_optima: 70, agua_optima: 65, temp_optima: 23, nutrientes_optimos: 80, co2_optimo: 400, dias_madurez: 45, color_hex: '#76b843' }
+    { id: 1, nombre_cientifico: 'Agave tequilana Weber', nombre_comun: 'Agave Azul (Tequilero)', tipo_fotosintesis: 'CAM', tasa_r_base: 0.140, capacidad_k_base: 4500, altura_max_m: 3.8, luz_optima: 65, agua_optima: 48, temp_optima: 22, nutrientes_optimos: 63, ph_optimo: 6.8, co2_optimo: 425, color_hex: '#4a858c' },
+    { id: 2, nombre_cientifico: 'Agave angustifolia Haw', nombre_comun: 'Agave Espadín (Mezcalero)', tipo_fotosintesis: 'CAM', tasa_r_base: 0.165, capacidad_k_base: 5200, altura_max_m: 4.2, luz_optima: 68, agua_optima: 42, temp_optima: 25, nutrientes_optimos: 55, ph_optimo: 7.0, co2_optimo: 425, color_hex: '#5c9c54' },
+    { id: 3, nombre_cientifico: 'Agave salmiana Otto', nombre_comun: 'Maguey Pulquero / Manso', tipo_fotosintesis: 'CAM', tasa_r_base: 0.120, capacidad_k_base: 6800, altura_max_m: 4.8, luz_optima: 63, agua_optima: 50, temp_optima: 18, nutrientes_optimos: 68, ph_optimo: 7.1, co2_optimo: 425, color_hex: '#28593a' },
+    { id: 4, nombre_cientifico: 'Agave cupreata Trel', nombre_comun: 'Agave Papalote', tipo_fotosintesis: 'CAM', tasa_r_base: 0.110, capacidad_k_base: 3800, altura_max_m: 3.1, luz_optima: 60, agua_optima: 53, temp_optima: 20, nutrientes_optimos: 63, ph_optimo: 6.4, co2_optimo: 425, color_hex: '#738c4a' },
+    { id: 5, nombre_cientifico: 'Arabidopsis thaliana', nombre_comun: 'Arabidopsis (Modelo Genético)', tipo_fotosintesis: 'C3', tasa_r_base: 0.250, capacidad_k_base: 850, altura_max_m: 1.2, luz_optima: 50, agua_optima: 63, temp_optima: 21, nutrientes_optimos: 68, ph_optimo: 6.5, co2_optimo: 425, color_hex: '#76b843' }
 ];
 
 const MORFOLOGIA_ESPECIES = {
@@ -24,21 +24,27 @@ const MORFOLOGIA_ESPECIES = {
 const EXPLICACIONES_MODELOS = {
     logistico: {
         titulo: '📐 Modelo Logístico de Verhulst: dN/dt = r·N(1 − N/K)',
-        texto: 'Describe un crecimiento sigmoidal (en forma de S) autorregulado. El agave crece lento al inicio (hijuelo), alcanza su velocidad máxima a mitad del ciclo (Año 3-4) y frena gradualmente al acercarse al límite de biomasa K.'
+        texto: 'Crecimiento sigmoidal autorregulado. La tasa efectiva es r·f(Liebig)·f(CO₂)·(1 − daño), y la K efectiva se reduce con el daño permanente.'
     },
     gompertz: {
         titulo: '📐 Modelo de Gompertz: N(t) = K·exp(−exp(−r(t − t₀)))',
-        texto: 'Curva sigmoidal asimétrica ideal para órganos de reserva (piña de agave). Su punto de inflexión ocurre antes del 50% de la biomasa máxima, reflejando una rápida acumulación inicial de tejido seguida de una maduración prolongada.'
+        texto: 'Sigmoide asimétrica ideal para órganos de reserva (piña). Su inflexión ocurre antes del 50% de K: acumulación inicial rápida y maduración prolongada.'
     },
     exponencial: {
         titulo: '📐 Modelo Exponencial: N(t) = N₀·e^(r·t)',
-        texto: 'Representa multiplicación celular sin restricción ambiental aparente. La biomasa se acelera continuamente a tasa r constante hasta topar de forma abrupta con el techo fisiológico K.'
+        texto: 'Multiplicación sin autorregulación: la biomasa se acelera a tasa r efectiva constante hasta topar con la K efectiva.'
     },
     lineal: {
         titulo: '📐 Modelo Lineal: N(t) = a·t + b',
-        texto: 'Asume una ganancia constante de gramos de biomasa por unidad de tiempo sin importar la edad de la planta. Útil como línea base de control en etapas cortas con clima uniforme.'
+        texto: 'Ganancia constante de biomasa por unidad de tiempo. Línea base de control para comparar contra los modelos sigmoidales.'
     }
 };
+
+const ETIQUETAS_ANIO = ['Establecimiento', 'Desarrollo Juvenil', 'Crecimiento Vegetativo', 'Acumulación Inulina', 'Cierre de Roseta', 'Engorda de Piña', 'Madurez / Quiote'];
+const SLIDERS_CLIMA = [
+    ['luz', 'param-luz', 'val-luz'], ['agua', 'param-agua', 'val-agua'], ['temp', 'param-temp', 'val-temp'],
+    ['tmin', 'param-tmin', 'val-tmin'], ['nut', 'param-nut', 'val-nut'], ['ph', 'param-ph', 'val-ph'], ['co2', 'param-co2', 'val-co2']
+];
 
 let especieActual = catalogoEspecies[0];
 let especieB = catalogoEspecies[2];
@@ -47,84 +53,55 @@ let lastRecordedTick = -1;
 let isGrowing = true;
 let simSpeed = 1.5;
 let abModeActive = false;
-
-const TOTAL_ANIOS = 7;
-const TICKS_POR_ANIO = 20;
-const DIAS_REALES_POR_ANIO = 365;
-const DIAS_REALES_TOTALES = TOTAL_ANIOS * DIAS_REALES_POR_ANIO; // 2555 días
-const FACTOR_DIAS_REALES = DIAS_REALES_TOTALES / 140;
+let modo = 'globo';
 
 let anioSeleccionadoParaEdicion = null;
 let timelineAnios = [];
+let timelineB = null;            // línea del tiempo real de la ubicación B (comparador A/B geográfico)
+let contextoGeo = null;          // { ubicacion, analisis, ubicacionB } cuando la simulación viene del globo
 
-function tickADiasReales(tick) {
-    return Math.round(tick * FACTOR_DIAS_REALES);
-}
+const $ = (id) => document.getElementById(id);
+const tickADiasReales = (tick) => Math.round(tick * AG.DIAS_POR_TICK);
+const obtenerAnioDesdeTick = (tick) => Math.min(AG.TOTAL_ANIOS, Math.max(1, Math.floor(tick / AG.TICKS_POR_ANIO) + 1));
 
-function inicializarTimelinePorEspecie(esp) {
-    const etiquetas = [
-        'Establecimiento',
-        'Desarrollo Juvenil',
-        'Crecimiento Vegetativo',
-        'Acumulación Inulina',
-        'Cierre de Roseta',
-        'Engorda de Piña',
-        'Madurez / Quiote'
-    ];
-
-    timelineAnios = etiquetas.map((etiqueta, idx) => ({
+function inicializarTimelinePorEspecie(esp, timelineReal = null) {
+    const optimo = AG.climaOptimo(esp);
+    timelineAnios = ETIQUETAS_ANIO.map((etiqueta, idx) => ({
         anio: idx + 1,
         etiqueta,
-        luz: Math.round(esp.luz_optima),
-        agua: Math.round(esp.agua_optima),
-        temp: +esp.temp_optima.toFixed(1),
-        nut: Math.round(esp.nutrientes_optimos),
-        co2: Math.round(esp.co2_optimo),
+        anioReal: timelineReal?.[idx]?.anioReal ?? null,
+        ...(timelineReal ? {
+            luz: timelineReal[idx].luz, agua: timelineReal[idx].agua, temp: timelineReal[idx].temp,
+            tmin: timelineReal[idx].tmin ?? optimo.tmin, nut: timelineReal[idx].nut, ph: timelineReal[idx].ph, co2: timelineReal[idx].co2
+        } : optimo),
         biomasaGuardada: null,
-        estresGuardado: null,
+        danioGuardado: null,
+        estadoAnio: null,
         plantaMuertaEnAnio: false,
         editadoManual: false
     }));
-
     renderizarNodosTimeline();
 }
 
-function obtenerAnioDesdeTick(tick) {
-    return Math.min(TOTAL_ANIOS, Math.max(1, Math.floor(tick / TICKS_POR_ANIO) + 1));
-}
-
 function renderizarNodosTimeline() {
-    const container = document.getElementById('timeline-nodes');
+    const container = $('timeline-nodes');
     if (!container) return;
-
     const anioCurso = obtenerAnioDesdeTick(currentDay);
+
     container.innerHTML = timelineAnios.map(item => {
-        const alcanzado = currentDay >= (item.anio - 1) * TICKS_POR_ANIO;
-        const esCurso = item.anio === anioCurso;
-        const esSeleccionado = item.anio === anioSeleccionadoParaEdicion;
-
-        const clases = [
-            'tl-node',
-            alcanzado ? 'reached' : '',
-            esCurso ? 'active-year' : '',
-            esSeleccionado ? 'selected' : ''
-        ].join(' ');
-
-        const diasFinAnio = item.anio * DIAS_REALES_POR_ANIO;
-        let resumen = `💧${item.agua}% | 🌡️${item.temp}°`;
-        if (item.plantaMuertaEnAnio) {
-            resumen = `💀 Muerta (${diasFinAnio}d)`;
-        } else if (item.biomasaGuardada !== null) {
-            resumen = `${Math.round(item.biomasaGuardada)}g | 💧${item.agua}%`;
-        }
+        const alcanzado = currentDay >= (item.anio - 1) * AG.TICKS_POR_ANIO;
+        const clases = ['tl-node', alcanzado ? 'reached' : '', item.anio === anioCurso ? 'active-year' : '',
+            item.anio === anioSeleccionadoParaEdicion ? 'selected' : '', item.estadoAnio ? `estado-${item.estadoAnio}` : ''].join(' ');
+        let resumen = `💧${Math.round(item.agua)}% 🌡️${item.temp}°`;
+        if (item.plantaMuertaEnAnio) resumen = '💀 Muerta';
+        else if (item.biomasaGuardada !== null) resumen = `${Math.round(item.biomasaGuardada)}g${item.danioGuardado > 0 ? ` · D${Math.round(item.danioGuardado)}%` : ''}`;
 
         return `
-            <div class="${clases}" data-anio="${item.anio}" title="Año ${item.anio} (Día ${diasFinAnio}) - ${item.etiqueta}">
-                <div class="tl-line" style="${item.plantaMuertaEnAnio ? 'background:#c0392b;border-color:#ff7675;' : ''}"></div>
-                <span class="tl-label">Año ${item.anio}${item.editadoManual ? '*' : ''}</span>
+            <div class="${clases}" data-anio="${item.anio}" title="Año ${item.anio}${item.anioReal ? ` (${item.anioReal}, datos reales)` : ''} - ${item.etiqueta}">
+                <div class="tl-line"></div>
+                <span class="tl-label">Año ${item.anio}${item.anioReal ? ` · ${item.anioReal}` : ''}${item.editadoManual ? '*' : ''}</span>
                 <span class="tl-sub">${resumen}</span>
-            </div>
-        `;
+            </div>`;
     }).join('');
 
     container.querySelectorAll('.tl-node').forEach(node => {
@@ -135,81 +112,61 @@ function renderizarNodosTimeline() {
 function cargarSlidersDesdeAnio(anioNum) {
     const datos = timelineAnios[anioNum - 1];
     if (!datos) return;
+    SLIDERS_CLIMA.forEach(([clave, slider, etiqueta]) => {
+        if (datos[clave] === null || datos[clave] === undefined) return;
+        $(slider).value = datos[clave];
+        $(etiqueta).innerText = datos[clave];
+    });
+}
 
-    document.getElementById('param-luz').value = datos.luz;
-    document.getElementById('val-luz').innerText = datos.luz;
-    document.getElementById('param-agua').value = datos.agua;
-    document.getElementById('val-agua').innerText = datos.agua;
-    document.getElementById('param-temp').value = datos.temp;
-    document.getElementById('val-temp').innerText = datos.temp;
-    document.getElementById('param-nut').value = datos.nut;
-    document.getElementById('val-nut').innerText = datos.nut;
-    document.getElementById('param-co2').value = datos.co2;
-    document.getElementById('val-co2').innerText = datos.co2;
+function textoClimaAnio(d) {
+    return `☀️ ${d.luz}% | 💧 ${d.agua}% | 🌡️ ${d.temp}°C | ❄️ ${d.tmin}°C | 🧪 ${d.nut}% | 🪨 pH ${d.ph} | 🫧 ${d.co2} ppm`;
 }
 
 function seleccionarAnioTimeline(anioNum) {
     anioSeleccionadoParaEdicion = anioNum;
     cargarSlidersDesdeAnio(anioNum);
-
     const d = timelineAnios[anioNum - 1];
     const rangoDias = `Día ${(anioNum - 1) * 365} al ${anioNum * 365}`;
-    document.getElementById('timeline-edit-status').innerText = `✏️ Editando Año ${anioNum} (${rangoDias})`;
-    document.getElementById('tl-detail-text').innerHTML =
-        `<b>Año ${anioNum} (${rangoDias}):</b> ☀️ Luz ${d.luz}% | 💧 Agua ${d.agua}% | 🌡️ Temp ${d.temp}°C | 🧪 NPK ${d.nut}% | 🫧 CO₂ ${d.co2} ppm`;
-    document.getElementById('btn-tl-live').classList.remove('hidden');
-
+    $('timeline-edit-status').innerText = `✏️ Editando Año ${anioNum} (${rangoDias})`;
+    $('tl-detail-text').innerHTML = `<b>Año ${anioNum}${d.anioReal ? ` (${d.anioReal})` : ''}:</b> ${textoClimaAnio(d)}`;
+    $('btn-tl-live').classList.remove('hidden');
     renderizarNodosTimeline();
 }
 
 function guardarSlidersEnAnioActivo() {
-    const anioObjetivo = anioSeleccionadoParaEdicion !== null
-        ? anioSeleccionadoParaEdicion
-        : obtenerAnioDesdeTick(currentDay);
+    const anioObjetivo = anioSeleccionadoParaEdicion ?? obtenerAnioDesdeTick(currentDay);
+    const valores = Object.fromEntries(SLIDERS_CLIMA.map(([clave, slider]) => [clave, parseFloat($(slider).value)]));
 
-    const nuevoLuz = parseFloat(document.getElementById('param-luz').value);
-    const nuevoAgua = parseFloat(document.getElementById('param-agua').value);
-    const nuevoTemp = parseFloat(document.getElementById('param-temp').value);
-    const nuevoNut = parseFloat(document.getElementById('param-nut').value);
-    const nuevoCo2 = parseFloat(document.getElementById('param-co2').value);
-
-    for (let i = anioObjetivo - 1; i < TOTAL_ANIOS; i++) {
-        if (i === anioObjetivo - 1 || !timelineAnios[i].editadoManual) {
-            timelineAnios[i].luz = nuevoLuz;
-            timelineAnios[i].agua = nuevoAgua;
-            timelineAnios[i].temp = nuevoTemp;
-            timelineAnios[i].nut = nuevoNut;
-            timelineAnios[i].co2 = nuevoCo2;
+    // Los años posteriores heredan el cambio salvo que hayan sido editados o provengan de datos reales
+    for (let i = anioObjetivo - 1; i < AG.TOTAL_ANIOS; i++) {
+        if (i === anioObjetivo - 1 || (!timelineAnios[i].editadoManual && !timelineAnios[i].anioReal)) {
+            Object.assign(timelineAnios[i], valores);
         }
     }
     timelineAnios[anioObjetivo - 1].editadoManual = true;
-
-    const d = timelineAnios[anioObjetivo - 1];
-    document.getElementById('tl-detail-text').innerHTML =
-        `<b>Año ${anioObjetivo} y posteriores actualizados:</b> ☀️ Luz ${d.luz}% | 💧 Agua ${d.agua}% | 🌡️ Temp ${d.temp}°C | 🧪 NPK ${d.nut}% | 🫧 CO₂ ${d.co2} ppm`;
-
+    $('tl-detail-text').innerHTML = `<b>Año ${anioObjetivo} actualizado:</b> ${textoClimaAnio(timelineAnios[anioObjetivo - 1])}`;
     recalcularHistorialGrafica();
     renderizarNodosTimeline();
 }
 
 function actualizarExplicacionModelo() {
-    const modelo = document.getElementById('model-select').value;
-    const info = EXPLICACIONES_MODELOS[modelo] || EXPLICACIONES_MODELOS.logistico;
-    const titleEl = document.getElementById('model-exp-title');
-    const descEl = document.getElementById('model-exp-desc');
-    if (titleEl && descEl) {
-        titleEl.innerText = info.titulo;
-        descEl.innerText = info.texto;
-    }
+    const info = EXPLICACIONES_MODELOS[$('model-select').value] || EXPLICACIONES_MODELOS.logistico;
+    $('model-exp-title').innerText = info.titulo;
+    $('model-exp-desc').innerText = info.texto;
 }
 
 let medicionesCorrida = [];
 let decisionesCorrida = [];
 let ultimaAlertaEmitida = '';
+let estadoA = AG.simularCiclo({ especie: especieActual, modelo: 'logistico', r: 0.14, K: 4500, timeline: AG.timelineConstante(AG.climaOptimo(especieActual)) }, 0);
+let estadoB = estadoA;
 
-let estadoA = { biomasa: 10, altura: 0.1, hojas: 0, ramas: 1, icr: 0, estresHidrico: 0, estresTermico: 0, estresGlobal: 0, fraccion: 0.001, diasCosecha: 2555, muerta: false };
-let estadoB = { biomasa: 10, altura: 0.1, hojas: 0, ramas: 1, icr: 0, estresHidrico: 0, estresTermico: 0, estresGlobal: 0, fraccion: 0.001, muerta: false };
+/* =====================================================================
+ *  ESCENA 3D DE LA PARCELA (Práctica 05)
+ * ===================================================================== */
 
+const contenedorParcela = $('parcela-container');
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x87CEEB, 0.008);
 const colorDia = new THREE.Color(0x87CEEB);
@@ -220,28 +177,23 @@ const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerH
 const initialCameraPos = new THREE.Vector3(0, 12, 28);
 camera.position.copy(initialCameraPos);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.domElement.id = 'three-canvas';
-document.body.appendChild(renderer.domElement);
+contenedorParcela.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.target.set(0, 3, 0);
 controls.maxPolarAngle = Math.PI / 2 - 0.03;
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-scene.add(ambientLight);
-
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
 dirLight.position.set(20, 35, 20);
 dirLight.castShadow = true;
-dirLight.shadow.camera.left = -40;
-dirLight.shadow.camera.right = 40;
-dirLight.shadow.camera.top = 40;
-dirLight.shadow.camera.bottom = -40;
+Object.assign(dirLight.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40 });
 dirLight.shadow.mapSize.width = 2048;
 dirLight.shadow.mapSize.height = 2048;
 scene.add(dirLight);
@@ -250,22 +202,21 @@ const planoGeo = new THREE.PlaneGeometry(150, 150, 60, 60);
 const pos = planoGeo.attributes.position.array;
 for (let i = 0; i < pos.length; i += 3) {
     const x = pos[i], y = pos[i + 1];
-    if (Math.sqrt(x * x + y * y) > 15) {
-        pos[i + 2] = Math.sin(x / 12) * Math.cos(y / 12) * 0.8;
-    }
+    if (Math.sqrt(x * x + y * y) > 15) pos[i + 2] = Math.sin(x / 12) * Math.cos(y / 12) * 0.8;
 }
 planoGeo.computeVertexNormals();
-const terreno = new THREE.Mesh(planoGeo, new THREE.MeshStandardMaterial({ color: 0x4a3b2c, roughness: 0.95 }));
+const materialTerreno = new THREE.MeshStandardMaterial({ color: 0x4a3b2c, roughness: 0.95 });
+const terreno = new THREE.Mesh(planoGeo, materialTerreno);
 terreno.rotation.x = -Math.PI / 2;
 terreno.receiveShadow = true;
 scene.add(terreno);
+const colorSueloSeco = new THREE.Color(0x8a6f4d);
+const colorSueloHumedo = new THREE.Color(0x3a2a1c);
 
-const plantasEntorno = [];
 (function generarEscenario() {
     const rocaMat = new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.8 });
     const troncoMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 1 });
     const hojasMat = new THREE.MeshStandardMaterial({ color: 0x2d4c1e, roughness: 0.9 });
-
     for (let i = 0; i < 95; i++) {
         const x = (Math.random() - 0.5) * 130;
         const z = (Math.random() - 0.5) * 130;
@@ -288,7 +239,6 @@ const plantasEntorno = [];
             copa.castShadow = true;
             arbol.add(tronco, copa);
             scene.add(arbol);
-            plantasEntorno.push(arbol);
         }
     }
 })();
@@ -313,13 +263,8 @@ function crearAgave(posX, posZ, id, escenarioGrupo) {
     const pina = new THREE.Mesh(pinaGeo, matPina);
     pina.castShadow = true;
     pina.userData = {
-        idAgave: id,
-        agaveRef: agaveGroup,
-        escenario: escenarioGrupo,
-        partType: 'pina',
-        name: `Piña / Corazón (Planta #${id} - Esc. ${escenarioGrupo})`,
-        type: 'Esfera Escalada',
-        biomassShare: 0.55,
+        idAgave: id, agaveRef: agaveGroup, escenario: escenarioGrupo, partType: 'pina',
+        name: `Piña / Corazón (Planta #${id} - Esc. ${escenarioGrupo})`, type: 'Esfera Escalada', biomassShare: 0.55,
         desc: 'Órgano de reserva principal de fructanos e inulina.'
     };
     agaveGroup.add(pina);
@@ -327,21 +272,14 @@ function crearAgave(posX, posZ, id, escenarioGrupo) {
 
     const quioteGroup = new THREE.Group();
     quioteGroup.position.y = 0.5;
-
     const alturaQuiote = 9.5;
     const quioteGeo = new THREE.CylinderGeometry(0.13, 0.26, alturaQuiote, 16);
     quioteGeo.translate(0, alturaQuiote / 2, 0);
-    const matQuiote = new THREE.MeshStandardMaterial({ color: 0x6e8f4e });
-    const quioteMesh = new THREE.Mesh(quioteGeo, matQuiote);
+    const quioteMesh = new THREE.Mesh(quioteGeo, new THREE.MeshStandardMaterial({ color: 0x6e8f4e }));
     quioteMesh.castShadow = true;
     quioteMesh.userData = {
-        idAgave: id,
-        agaveRef: agaveGroup,
-        escenario: escenarioGrupo,
-        partType: 'quiote',
-        name: `Quiote Floral (Planta #${id} - Esc. ${escenarioGrupo})`,
-        type: 'Cilindro Compuesto (9.5m)',
-        biomassShare: 0.15,
+        idAgave: id, agaveRef: agaveGroup, escenario: escenarioGrupo, partType: 'quiote',
+        name: `Quiote Floral (Planta #${id} - Esc. ${escenarioGrupo})`, type: 'Cilindro Compuesto (9.5m)', biomassShare: 0.15,
         desc: 'Inflorescencia reproductiva; si se corta (desquiote), la piña concentra más azúcares.'
     };
     quioteGroup.add(quioteMesh);
@@ -350,9 +288,8 @@ function crearAgave(posX, posZ, id, escenarioGrupo) {
     const matFlor = new THREE.MeshStandardMaterial({ color: 0xc5d86d });
     for (let k = 0; k < 5; k++) {
         const ramaFlor = new THREE.Mesh(new THREE.SphereGeometry(0.42, 10, 10), matFlor);
-        const hRama = alturaQuiote - 0.4 - (k * 0.75);
         const ang = k * 1.4;
-        ramaFlor.position.set(Math.cos(ang) * 0.38, hRama, Math.sin(ang) * 0.38);
+        ramaFlor.position.set(Math.cos(ang) * 0.38, alturaQuiote - 0.4 - (k * 0.75), Math.sin(ang) * 0.38);
         ramaFlor.scale.set(1.3, 0.45, 1.3);
         ramaFlor.userData = quioteMesh.userData;
         quioteGroup.add(ramaFlor);
@@ -363,35 +300,24 @@ function crearAgave(posX, posZ, id, escenarioGrupo) {
     const pencasGroup = new THREE.Group();
     const pivotesArray = [];
     const pencasMallas = [];
-    const capas = 5, pencasPorCapa = 12;
-
-    for (let i = 0; i < capas; i++) {
-        for (let j = 0; j < pencasPorCapa; j++) {
+    for (let i = 0; i < 5; i++) {
+        for (let j = 0; j < 12; j++) {
             const pivote = new THREE.Group();
-            const angulo = (j / pencasPorCapa) * Math.PI * 2 + (i % 2) * (Math.PI / pencasPorCapa);
-            pivote.rotation.y = angulo;
+            pivote.rotation.y = (j / 12) * Math.PI * 2 + (i % 2) * (Math.PI / 12);
             pivote.position.y = 0.12 + (i * 0.28);
 
             const hPenca = 3.4 + (i * 0.2);
             const pencaGeo = new THREE.ConeGeometry(0.38, hPenca, 5);
             pencaGeo.translate(0, hPenca / 2, 0);
-
             const penca = new THREE.Mesh(pencaGeo, matPencas);
             const inclinacionBase = (Math.PI / 2.2) - (i * 0.22);
             penca.rotation.x = inclinacionBase;
             penca.userData = {
-                idAgave: id,
-                agaveRef: agaveGroup,
-                escenario: escenarioGrupo,
-                partType: 'penca',
-                inclinacionBase,
-                name: `Penca Foliar C${i + 1} (Planta #${id} - Esc. ${escenarioGrupo})`,
-                type: 'Cono Modificado',
-                biomassShare: 0.30,
+                idAgave: id, agaveRef: agaveGroup, escenario: escenarioGrupo, partType: 'penca', inclinacionBase,
+                name: `Penca Foliar C${i + 1} (Planta #${id} - Esc. ${escenarioGrupo})`, type: 'Cono Modificado', biomassShare: 0.30,
                 desc: 'Tejido fotosintético CAM receptor de radiación y estrés hídrico.'
             };
             penca.castShadow = true;
-
             pivote.add(penca);
             pencasGroup.add(pivote);
             pivotesArray.push(pivote);
@@ -399,7 +325,6 @@ function crearAgave(posX, posZ, id, escenarioGrupo) {
             interactableObjects.push(penca);
         }
     }
-
     agaveGroup.add(pencasGroup);
     scene.add(agaveGroup);
 
@@ -407,32 +332,23 @@ function crearAgave(posX, posZ, id, escenarioGrupo) {
     pencasGroup.scale.set(0.001, 0.001, 0.001);
     quioteGroup.scale.set(0.001, 0.001, 0.001);
 
-    agaveGroup.userData.pina = pina;
-    agaveGroup.userData.pencasGroup = pencasGroup;
-    agaveGroup.userData.quiote = quioteGroup;
-    agaveGroup.userData.pivotes = pivotesArray;
-    agaveGroup.userData.pencasMallas = pencasMallas;
+    Object.assign(agaveGroup.userData, { pina, pencasGroup, quiote: quioteGroup, pivotes: pivotesArray, pencasMallas });
     todosLosAgaves.push(agaveGroup);
 }
 
 let idCounter = 1;
 for (let fila = 0; fila < 2; fila++) {
     for (let col = 0; col < 3; col++) {
-        const x = (col - 1) * 8.5;
-        const z = fila === 0 ? 4.8 : -4.8;
-        crearAgave(x, z, idCounter++, fila === 0 ? 'A' : 'B');
+        crearAgave((col - 1) * 8.5, fila === 0 ? 4.8 : -4.8, idCounter++, fila === 0 ? 'A' : 'B');
     }
 }
 
 function aplicarMorfologiaEspecie() {
     todosLosAgaves.forEach(agave => {
         const esB = (agave.userData.escenario === 'B' && abModeActive);
-        const espObj = esB ? especieB : especieActual;
-        const morf = MORFOLOGIA_ESPECIES[espObj.id] || MORFOLOGIA_ESPECIES[1];
-
+        const morf = MORFOLOGIA_ESPECIES[(esB ? especieB : especieActual).id] || MORFOLOGIA_ESPECIES[1];
         agave.userData.materialPina.color.setHex(morf.colorPina);
         agave.userData.materialPencas.color.set(morf.colorHoja);
-
         agave.userData.pencasMallas.forEach(penca => {
             penca.scale.set(morf.pencaAncho, morf.pencaLargo, morf.pencaGrosor);
             penca.rotation.x = penca.userData.inclinacionBase + morf.aperturaRoseta;
@@ -440,122 +356,47 @@ function aplicarMorfologiaEspecie() {
     });
 }
 
-function simularCrecimientoAcumulado(configBase, diaObjetivo, especieRef, usarTimelineA = true) {
-    const opt = especieRef;
-    const K = configBase.k;
-    const N0 = Math.max(15, K * 0.02);
-    let biomasa = N0;
-    let plantaMuerta = false;
-    let ticksEstresLetal = 0;
+/* =====================================================================
+ *  MOTOR DE SIMULACIÓN (usa js/agronomia.js)
+ * ===================================================================== */
 
-    if (usarTimelineA) {
-        timelineAnios.forEach(a => { a.plantaMuertaEnAnio = false; });
-    }
-
-    const pasos = Math.max(1, Math.floor(diaObjetivo));
-    let ultimoEstresH = 0, ultimoEstresT = 0, ultimoEstresG = 0, ultimaREf = configBase.r;
-
-    for (let t = 1; t <= pasos; t++) {
-        const anioIdx = Math.min(TOTAL_ANIOS - 1, Math.floor((t - 1) / TICKS_POR_ANIO));
-        const climaAnio = (usarTimelineA && timelineAnios[anioIdx]) ? timelineAnios[anioIdx] : configBase;
-
-        const agua = usarTimelineA ? climaAnio.agua : configBase.agua;
-        const temp = usarTimelineA ? climaAnio.temp : configBase.temp;
-        const luz  = usarTimelineA ? climaAnio.luz  : configBase.luz;
-        const nut  = usarTimelineA ? climaAnio.nut  : configBase.nut;
-        const co2  = usarTimelineA ? climaAnio.co2  : configBase.co2;
-
-        const estresHidrico = Math.min(100, Math.abs(agua - opt.agua_optima) * 2.2);
-        const estresTermico = Math.min(100, Math.abs(temp - opt.temp_optima) * 4.2);
-        const estresLuminico = Math.min(100, Math.abs(luz - opt.luz_optima) * 1.6);
-        const estresNutricional = Math.min(100, Math.abs(nut - opt.nutrientes_optimos) * 1.5);
-
-        const estresGlobal = Math.min(100,
-            (estresHidrico * 0.45) +
-            (estresTermico * 0.30) +
-            (estresLuminico * 0.15) +
-            (estresNutricional * 0.10)
-        );
-
-        const condicionLetal = (agua <= 8) || (agua >= 96) || (temp >= 43) || (temp <= 6) || (estresGlobal >= 78);
-
-        if (condicionLetal) {
-            ticksEstresLetal++;
-            if (ticksEstresLetal >= 3) {
-                plantaMuerta = true;
-            }
-        } else if (!plantaMuerta) {
-            ticksEstresLetal = Math.max(0, ticksEstresLetal - 1);
-        }
-
-        if (plantaMuerta) {
-            biomasa = Math.max(N0 * 0.4, biomasa * 0.96);
-            ultimaREf = 0;
-            if (usarTimelineA && timelineAnios[anioIdx]) {
-                timelineAnios[anioIdx].plantaMuertaEnAnio = true;
-            }
-        } else if (estresGlobal >= 60) {
-            biomasa = Math.max(N0, biomasa * 0.99);
-            ultimaREf = 0;
-        } else {
-            const factorCO2 = 1 + ((co2 - opt.co2_optimo) / 2500);
-            const penalizacion = Math.max(0, 1 - (estresGlobal / 65));
-            const rEfectiva = Math.max(0, configBase.r * penalizacion * factorCO2);
-
-            let dN = 0;
-            if (configBase.modelo === 'lineal') {
-                dN = (K * rEfectiva) / 14;
-            } else if (configBase.modelo === 'exponencial') {
-                dN = (rEfectiva * 0.32) * biomasa;
-            } else if (configBase.modelo === 'gompertz') {
-                const ratio = Math.max(0.0001, biomasa / K);
-                dN = (rEfectiva * 0.48) * biomasa * Math.max(0, -Math.log(ratio));
-            } else {
-                dN = (rEfectiva * 0.65) * biomasa * Math.max(0, 1 - (biomasa / K));
-            }
-
-            biomasa = Math.min(K, biomasa + dN);
-            ultimaREf = rEfectiva;
-        }
-
-        ultimoEstresH = estresHidrico;
-        ultimoEstresT = estresTermico;
-        ultimoEstresG = plantaMuerta ? 100 : estresGlobal;
-
-        if (usarTimelineA && t % TICKS_POR_ANIO === 0 && timelineAnios[anioIdx]) {
-            timelineAnios[anioIdx].biomasaGuardada = +biomasa.toFixed(1);
-            timelineAnios[anioIdx].estresGuardado = +ultimoEstresG.toFixed(1);
-        }
-    }
-
-    const fraccion = Math.min(1, Math.max(0.001, biomasa / K));
-    const altura = +(fraccion * opt.altura_max_m).toFixed(2);
-    const hojas = Math.round(fraccion * 60);
-    const ramas = (!plantaMuerta && fraccion > 0.62) ? 2 : 1;
-    const icr = plantaMuerta ? 0 : +(ultimaREf * (1 - biomasa / K)).toFixed(4);
-
-    const diasRealesTranscurridos = tickADiasReales(diaObjetivo);
-    const penalizacionCosecha = Math.max(0.25, 1 - (ultimoEstresG / 130));
-    const diasCosecha = plantaMuerta
-        ? 0
-        : Math.max(0, Math.round((DIAS_REALES_TOTALES / penalizacionCosecha) - diasRealesTranscurridos));
-
+function obtenerParamsBaseA() {
     return {
-        biomasa: +biomasa.toFixed(1),
-        altura,
-        hojas,
-        ramas,
-        icr: Math.max(0, icr),
-        estresHidrico: +ultimoEstresH.toFixed(1),
-        estresTermico: +ultimoEstresT.toFixed(1),
-        estresGlobal: +ultimoEstresG.toFixed(1),
-        fraccion,
-        diasCosecha,
-        muerta: plantaMuerta
+        especie: especieActual,
+        modelo: $('model-select').value,
+        r: parseFloat($('param-r').value),
+        K: parseFloat($('param-k').value),
+        timeline: timelineAnios
     };
 }
 
-const ctxChart = document.getElementById('growthChart').getContext('2d');
+function obtenerParamsBaseB(paramsA) {
+    if (!abModeActive) return paramsA;
+    const esp = especieB;
+    const otraEspecie = esp.id !== especieActual.id;
+    const timeline = timelineB
+        ? timelineB
+        : timelineAnios.map(a => ({ ...a, agua: parseFloat($('param-agua-b').value), temp: parseFloat($('param-temp-b').value) }));
+    return {
+        especie: esp,
+        modelo: $('model-b-select').value,
+        r: otraEspecie ? esp.tasa_r_base : paramsA.r,
+        K: otraEspecie ? esp.capacidad_k_base : paramsA.K,
+        timeline
+    };
+}
+
+function sincronizarTimelineConResultado(res) {
+    timelineAnios.forEach((a, i) => {
+        const r = res.anual[i];
+        a.biomasaGuardada = r ? r.biomasa : null;
+        a.danioGuardado = r ? r.danio : null;
+        a.estadoAnio = r ? r.estado : null;
+        a.plantaMuertaEnAnio = r ? (r.muerta && (!res.anual[i - 1] || !res.anual[i - 1].muerta)) || (r.muerta && i === 0) : false;
+    });
+}
+
+const ctxChart = $('growthChart').getContext('2d');
 const growthChart = new Chart(ctxChart, {
     type: 'line',
     data: {
@@ -563,7 +404,8 @@ const growthChart = new Chart(ctxChart, {
         datasets: [
             { label: 'Biomasa A (g)', data: [], borderColor: '#2ecc71', backgroundColor: 'rgba(46,204,113,0.15)', tension: 0.3, fill: true },
             { label: 'Biomasa B (g)', data: [], borderColor: '#f39c12', borderDash: [5, 5], tension: 0.3, hidden: true },
-            { label: 'Estrés Global (%)', data: [], borderColor: '#e74c3c', tension: 0.2, yAxisID: 'y1' }
+            { label: 'Estrés Global (%)', data: [], borderColor: '#e74c3c', tension: 0.2, yAxisID: 'y1' },
+            { label: 'Daño acumulado (%)', data: [], borderColor: '#a855f7', borderDash: [3, 3], tension: 0.2, yAxisID: 'y1' }
         ]
     },
     options: {
@@ -579,116 +421,156 @@ const growthChart = new Chart(ctxChart, {
     }
 });
 
+function medicionDesdeEstado(est, diasReales) {
+    return {
+        tick_dia: diasReales,
+        altura: est.altura,
+        biomasa: est.biomasa,
+        num_hojas: est.hojas,
+        num_ramas: est.ramas,
+        icr: est.icr,
+        estres_hidrico: est.estresHidrico,
+        estres_termico: est.estresTermico,
+        estres_global: est.estresGlobal,
+        danio_acumulado: est.danio
+    };
+}
+
+function agregarPuntoGrafica(tick, estA, estB) {
+    const diasReales = tickADiasReales(tick);
+    growthChart.data.labels.push(`A${obtenerAnioDesdeTick(tick)}·${diasReales}d`);
+    growthChart.data.datasets[0].data.push(estA.biomasa);
+    growthChart.data.datasets[1].data.push(estB.biomasa);
+    growthChart.data.datasets[2].data.push(estA.estresGlobal);
+    growthChart.data.datasets[3].data.push(estA.danio);
+}
+
 function recalcularHistorialGrafica() {
     growthChart.data.labels = [];
     growthChart.data.datasets.forEach(d => d.data = []);
     medicionesCorrida = [];
+    const paramsA = obtenerParamsBaseA();
+    const paramsB = obtenerParamsBaseB(paramsA);
 
-    const maxTick = Math.floor(currentDay);
-    const paramsBaseA = obtenerParamsBaseA();
-    const espRefB = abModeActive ? especieB : especieActual;
-    const paramsBaseB = obtenerParamsBaseB(paramsBaseA, espRefB);
-
-    for (let t = 0; t <= maxTick; t += 5) {
-        const estA = simularCrecimientoAcumulado(paramsBaseA, t, especieActual, true);
-        const estB = simularCrecimientoAcumulado(paramsBaseB, t, espRefB, false);
-        const anio = obtenerAnioDesdeTick(t);
-        const diasReales = tickADiasReales(t);
-
-        medicionesCorrida.push({
-            tick_dia: diasReales,
-            altura: estA.altura,
-            biomasa: estA.biomasa,
-            num_hojas: estA.hojas,
-            num_ramas: estA.ramas,
-            icr: estA.icr,
-            estres_hidrico: estA.estresHidrico,
-            estres_termico: estA.estresTermico,
-            estres_global: estA.estresGlobal
-        });
-
-        growthChart.data.labels.push(`A${anio}·${diasReales}d`);
-        growthChart.data.datasets[0].data.push(estA.biomasa);
-        growthChart.data.datasets[1].data.push(estB.biomasa);
-        growthChart.data.datasets[2].data.push(estA.estresGlobal);
+    for (let t = 0; t <= Math.floor(currentDay); t += 5) {
+        const estA = AG.simularCiclo(paramsA, t);
+        const estB = AG.simularCiclo(paramsB, t);
+        medicionesCorrida.push(medicionDesdeEstado(estA, tickADiasReales(t)));
+        agregarPuntoGrafica(t, estA, estB);
     }
     growthChart.update();
 }
 
+/* =====================================================================
+ *  MOTOR DE DECISIONES FISIOLÓGICAS (basado en zonas de la investigación)
+ * ===================================================================== */
+
+const RECOMENDACIONES_ZONA = {
+    agua: {
+        bajo: (v, u) => `Aumentar riego: humedad ${v}% bajo el umbral crítico (${u.critico_min}%). Sin ganancia de CO₂ y con daño acumulándose.`,
+        alto: (v, u) => `Drenar y suspender riego: humedad ${v}% sobre ${u.critico_max}% → asfixia radicular y pudrición (Fusarium/Erwinia).`
+    },
+    temperatura: {
+        bajo: (v, u) => `Frío crítico (${v} °C < ${u.critico_min} °C): metabolismo CAM detenido. Proteger con cubierta o reubicar el cultivo.`,
+        alto: (v, u) => `Calor crítico (${v} °C > ${u.critico_max} °C): cierre estomático nocturno y quemaduras. Malla sombra y riego de auxilio.`
+    },
+    luz: {
+        bajo: (v, u) => `Radiación insuficiente (${v}% < ${u.critico_min}%): balance de carbono negativo. Eliminar sombra/competencia.`,
+        alto: (v, u) => `Radiación excesiva (${v}%): riesgo de fotoinhibición. Sombra parcial en plántulas.`
+    },
+    nutrientes: {
+        bajo: (v, u) => `Deficiencia nutricional severa (${v}% < ${u.critico_min}%): fertilizar NPK + materia orgánica.`,
+        alto: (v, u) => `Exceso de sales/fertilizante (${v}% > ${u.critico_max}%): lavar el suelo y suspender fertilización.`
+    },
+    ph: {
+        bajo: (v, u) => `Suelo muy ácido (pH ${v} < ${u.critico_min}): toxicidad por aluminio. Encalar.`,
+        alto: (v, u) => `Suelo muy alcalino/sódico (pH ${v} > ${u.critico_max}): aplicar yeso agrícola y materia orgánica.`
+    },
+    co2: {
+        bajo: (v, u) => `CO₂ bajo el punto de compensación (${v} ppm < ${u.critico_min}).`,
+        alto: (v) => `CO₂ anormalmente alto (${v} ppm).`
+    }
+};
+
+function diagnosticarZonas(ev, umbrales) {
+    const letal = [], critico = [], sub = [];
+    Object.entries(ev.variables).forEach(([v, e]) => {
+        if (e.zona.startsWith('letal')) letal.push([v, e]);
+        else if (e.zona.startsWith('critico')) critico.push([v, e]);
+        else if (e.zona.startsWith('suboptimo') && e.f < 0.5) sub.push([v, e]);
+    });
+    return { letal, critico, sub, umbrales };
+}
+
 function evaluarMotorDecisiones(tickDia) {
-    const box = document.getElementById('decision-box');
-    const txt = document.getElementById('decision-text');
-    const winnerTxt = document.getElementById('ab-winner-text');
+    const box = $('decision-box');
+    const txt = $('decision-text');
+    const winnerTxt = $('ab-winner-text');
     const anioCurso = obtenerAnioDesdeTick(tickDia);
     const diasReales = tickADiasReales(tickDia);
-    const clima = timelineAnios[anioCurso - 1] || {
-        agua: parseFloat(document.getElementById('param-agua').value),
-        temp: parseFloat(document.getElementById('param-temp').value),
-        nut: parseFloat(document.getElementById('param-nut').value)
-    };
+    const clima = timelineAnios[anioCurso - 1];
+    const u = AG.obtenerUmbrales(especieActual);
+    const diag = diagnosticarZonas(estadoA.evaluacion, u);
 
-    let tipo = 'Óptimo Fisiológico';
-    let valor = estadoA.estresGlobal;
-    let umbral = 25;
-    let recomendacion = `Año ${anioCurso} (Día ${diasReales}): Condiciones estables. Cosecha en ${estadoA.diasCosecha} días.`;
+    let tipo = 'Óptimo Fisiológico', severidad = 'info', valor = estadoA.estresGlobal, umbral = 25;
+    let recomendacion = `Año ${anioCurso} (Día ${diasReales}): todas las variables en zona favorable. Cosecha estimada en ${estadoA.diasCosecha} días.`;
     box.className = 'decision-ok';
+    const zonaLado = (e) => e.zona.endsWith('bajo') ? 'bajo' : 'alto';
 
     if (estadoA.muerta) {
         box.className = 'decision-danger';
-        tipo = 'Muerte Fisiológica';
-        valor = 100;
-        umbral = 78;
-        recomendacion = `💀 PLANTA MUERTA (Punto de Marchitez Permanente alcanzado). El tejido sufrió necrosis irreversible; reinicia o corrige el año donde ocurrió el estrés letal.`;
-    } else if (estadoA.estresHidrico > 35) {
+        tipo = 'Muerte Fisiológica'; severidad = 'critica'; valor = 100; umbral = 100;
+        recomendacion = `💀 PLANTA MUERTA en el año ${Math.ceil(estadoA.tickMuerte / AG.TICKS_POR_ANIO)} por ${AG.NOMBRES_VARIABLE[estadoA.causaMuerte] || 'estrés combinado'}. Daño ≥ 100%: no hay recuperación total ni parcial. Corrige ese año o elige otra especie/ubicación.`;
+    } else if (diag.letal.length) {
+        const [v, e] = diag.letal[0];
+        const diasRestantes = Math.max(1, Math.round((100 - estadoA.danio) / Math.max(0.01, estadoA.evaluacion.danioDiario)));
         box.className = 'decision-danger';
-        if (clima.agua < especieActual.agua_optima) {
-            tipo = 'Déficit Hídrico Crítico';
-            valor = estadoA.estresHidrico;
-            umbral = 35;
-            recomendacion = `⚠️ Año ${anioCurso}: Aumentar riego (+${Math.round(especieActual.agua_optima - clima.agua)}% humedad). Si baja de 8% la planta morirá.`;
-        } else {
-            tipo = 'Exceso de Humedad';
-            valor = estadoA.estresHidrico;
-            umbral = 35;
-            recomendacion = `⚠️ Año ${anioCurso}: Reducir riego por riesgo de pudrición y asfixia radicular en la piña.`;
-        }
-    } else if (estadoA.estresTermico > 30) {
+        tipo = `Condición letal: ${v}`; severidad = 'critica'; valor = e.valor; umbral = zonaLado(e) === 'bajo' ? u[v].letal_min : u[v].letal_max;
+        recomendacion = `☠️ ${AG.NOMBRES_VARIABLE[v]} en zona LETAL (${e.valor}). Muerte en ~${diasRestantes} días si no se corrige. ${RECOMENDACIONES_ZONA[v][zonaLado(e)](e.valor, u[v])}`;
+    } else if (estadoA.danio >= 70) {
+        box.className = 'decision-danger';
+        tipo = 'Daño Severo'; severidad = 'critica'; valor = estadoA.danio; umbral = 70;
+        recomendacion = `🩸 Daño ${estadoA.danio}% (≥ 70%): crecimiento detenido. Solo una corrección inmediata permite recuperación parcial.`;
+    } else if (diag.critico.length) {
+        const [v, e] = diag.critico[0];
+        box.className = 'decision-danger';
+        tipo = `Zona crítica: ${v}`; severidad = 'critica'; valor = e.valor; umbral = zonaLado(e) === 'bajo' ? u[v].critico_min : u[v].critico_max;
+        recomendacion = `⚠️ Año ${anioCurso}: ${RECOMENDACIONES_ZONA[v][zonaLado(e)](e.valor, u[v])}`;
+    } else if (estadoA.danio >= 30) {
         box.className = 'decision-warn';
-        tipo = 'Alerta Térmica';
-        valor = estadoA.estresTermico;
-        umbral = 30;
-        recomendacion = clima.temp > especieActual.temp_optima
-            ? `🌡️ Año ${anioCurso}: Reducir temperatura (${clima.temp}°C vs óptimo ${especieActual.temp_optima}°C).`
-            : `🌡️ Año ${anioCurso}: Elevar temperatura para reactivar metabolismo CAM.`;
-    } else if (clima.nut < especieActual.nutrientes_optimos - 15) {
+        tipo = 'Daño Parcial'; severidad = 'advertencia'; valor = estadoA.danio; umbral = 30;
+        recomendacion = `🩹 Daño ${estadoA.danio}% con ${estadoA.danioPermanente}% permanente: la planta se recupera solo parcialmente (K efectiva reducida).`;
+    } else if (clima && AG.danioHelada(clima.tmin, u.tmin) > 0) {
         box.className = 'decision-warn';
-        tipo = 'Deficiencia Nutricional';
-        valor = clima.nut;
-        umbral = especieActual.nutrientes_optimos;
-        recomendacion = `🧪 Año ${anioCurso}: Aplicar fertirriego NPK hasta ${especieActual.nutrientes_optimos}% para alcanzar capacidad K.`;
+        tipo = 'Riesgo de Helada'; severidad = 'advertencia'; valor = clima.tmin; umbral = u.tmin.critico_min;
+        recomendacion = `❄️ Año ${anioCurso}: mínima extrema de ${clima.tmin} °C (daño desde ${u.tmin.critico_min} °C, letal ${u.tmin.letal_min} °C). Plantar en laderas, evitar hondonadas.`;
+    } else if (diag.sub.length) {
+        const [v, e] = diag.sub.sort((a, b) => a[1].f - b[1].f)[0];
+        box.className = 'decision-warn';
+        tipo = `Limitante: ${v}`; severidad = 'advertencia'; valor = e.valor; umbral = zonaLado(e) === 'bajo' ? u[v].optimo_min : u[v].optimo_max;
+        recomendacion = `📉 Año ${anioCurso}: ${AG.NOMBRES_VARIABLE[v]} (${e.valor}) fuera del óptimo [${u[v].optimo_min}-${u[v].optimo_max}]: crecimiento al ${Math.round(e.f * 100)}% (ley del mínimo).`;
     } else if (estadoA.fraccion >= 0.65 && estadoA.fraccion < 0.92) {
         box.className = 'decision-warn';
-        tipo = 'Emergencia de Quiote';
-        valor = +(estadoA.fraccion * 100).toFixed(1);
-        umbral = 65;
+        tipo = 'Emergencia de Quiote'; valor = +(estadoA.fraccion * 100).toFixed(1); umbral = 65;
         recomendacion = `✂️ Quiote floral emergiendo: selecciona cada planta en 3D y presiona "Cortar Quiote" para concentrar inulina en la piña.`;
     } else if (estadoA.fraccion >= 0.92) {
-        box.className = 'decision-ok';
-        tipo = 'Madurez de Cosecha';
-        valor = +(estadoA.fraccion * 100).toFixed(1);
-        umbral = 92;
-        recomendacion = `✅ Año 7 completado (>92% K). Programar jima de la piña.`;
+        tipo = 'Madurez de Cosecha'; valor = +(estadoA.fraccion * 100).toFixed(1); umbral = 92;
+        recomendacion = `✅ Biomasa > 92% de K. Programar jima de la piña.`;
     }
 
     txt.innerText = recomendacion;
 
     if (abModeActive) {
         winnerTxt.classList.remove('hidden');
-        const diff = (estadoA.biomasa - estadoB.biomasa).toFixed(1);
-        if (estadoA.biomasa >= estadoB.biomasa) {
-            winnerTxt.innerText = `🏆 Ganador A/B: Esc. A (${especieActual.nombre_comun}) con +${diff}g biomasa | Estrés ${estadoA.estresGlobal}% vs ${estadoB.estresGlobal}%`;
+        const etiquetaA = contextoGeo?.ubicacion ? contextoGeo.ubicacion.nombre : especieActual.nombre_comun;
+        const etiquetaB = contextoGeo?.ubicacionB ? contextoGeo.ubicacionB.nombre : especieB.nombre_comun;
+        if (estadoA.muerta !== estadoB.muerta) {
+            winnerTxt.innerText = `🏆 Ganador A/B: ${estadoA.muerta ? `B (${etiquetaB})` : `A (${etiquetaA})`} — en la otra parcela la planta murió.`;
         } else {
-            winnerTxt.innerText = `🏆 Ganador A/B: Esc. B (${especieB.nombre_comun}) con +${Math.abs(diff)}g biomasa | Estrés ${estadoB.estresGlobal}% vs ${estadoA.estresGlobal}%`;
+            const diff = (estadoA.biomasa - estadoB.biomasa).toFixed(1);
+            winnerTxt.innerText = estadoA.biomasa >= estadoB.biomasa
+                ? `🏆 Ganador A/B: A (${etiquetaA}) con +${diff} g | Daño ${estadoA.danio}% vs ${estadoB.danio}%`
+                : `🏆 Ganador A/B: B (${etiquetaB}) con +${Math.abs(diff)} g | Daño ${estadoB.danio}% vs ${estadoA.danio}%`;
         }
     } else {
         winnerTxt.classList.add('hidden');
@@ -696,360 +578,330 @@ function evaluarMotorDecisiones(tickDia) {
 
     if (tipo !== ultimaAlertaEmitida && tickDia > 0) {
         ultimaAlertaEmitida = tipo;
-        decisionesCorrida.push({
-            tick_dia: diasReales,
-            tipo_alerta: tipo,
-            indicador_valor: valor,
-            umbral,
-            recomendacion
-        });
+        decisionesCorrida.push({ tick_dia: diasReales, tipo_alerta: tipo, severidad, indicador_valor: +(+valor).toFixed(2), umbral, recomendacion: recomendacion.slice(0, 255) });
     }
 }
 
+/* =====================================================================
+ *  CATÁLOGO Y PERSISTENCIA
+ * ===================================================================== */
+
 async function cargarCatalogoEspecies() {
-    const statusBadge = document.getElementById('db-status');
-    const selectA = document.getElementById('species-select');
-    const selectB = document.getElementById('species-b-select');
+    const statusBadge = $('db-status');
     try {
-        const res = await fetch(`${API_BASE}/especies`);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
+        const data = await apiGet('/especies');
         if (Array.isArray(data) && data.length > 0) {
             catalogoEspecies = data.map(e => ({
                 ...e,
                 id: +e.id,
-                tasa_r_base: +e.tasa_r_base,
-                capacidad_k_base: +e.capacidad_k_base,
-                altura_max_m: +e.altura_max_m,
-                luz_optima: +e.luz_optima,
-                agua_optima: +e.agua_optima,
-                temp_optima: +e.temp_optima,
-                nutrientes_optimos: +e.nutrientes_optimos,
-                co2_optimo: +e.co2_optimo,
-                dias_madurez: +e.dias_madurez
+                tasa_r_base: +e.tasa_r_base, capacidad_k_base: +e.capacidad_k_base, altura_max_m: +e.altura_max_m,
+                luz_optima: +e.luz_optima, agua_optima: +e.agua_optima, temp_optima: +e.temp_optima,
+                nutrientes_optimos: +e.nutrientes_optimos, ph_optimo: +e.ph_optimo, co2_optimo: +e.co2_optimo
             }));
             statusBadge.innerText = 'MySQL Conectado';
             statusBadge.className = 'badge badge-ok';
         }
     } catch (err) {
-        statusBadge.innerText = 'Modo Local (XAMPP)';
+        statusBadge.innerText = 'Modo Local (sin MySQL)';
         statusBadge.className = 'badge badge-warn';
     }
+    $('geo-db-status').innerText = statusBadge.innerText;
+    $('geo-db-status').className = statusBadge.className;
 
-    const opcionesHTML = catalogoEspecies.map(e =>
-        `<option value="${e.id}">${e.nombre_comun} (${e.nombre_cientifico})</option>`
-    ).join('');
-
-    selectA.innerHTML = opcionesHTML;
-    if (selectB) {
-        selectB.innerHTML = opcionesHTML;
-        const defaultB = catalogoEspecies[2] || catalogoEspecies[1] || catalogoEspecies[0];
-        especieB = defaultB;
-        selectB.value = defaultB.id;
-    }
+    const opcionesHTML = catalogoEspecies.map(e => `<option value="${e.id}">${e.nombre_comun} (${e.nombre_cientifico})</option>`).join('');
+    $('species-select').innerHTML = opcionesHTML;
+    $('species-b-select').innerHTML = opcionesHTML;
+    especieB = catalogoEspecies[2] || catalogoEspecies[0];
+    $('species-b-select').value = especieB.id;
 
     aplicarEspecieSeleccionada(catalogoEspecies[0].id);
+    await observatorio.alCargarCatalogo();
 }
 
-function aplicarEspecieSeleccionada(id) {
-    const esp = catalogoEspecies.find(e => e.id === +id) || catalogoEspecies[0];
-    especieActual = esp;
+function aplicarEspecieSeleccionada(id, timelineReal = null) {
+    especieActual = catalogoEspecies.find(e => e.id === +id) || catalogoEspecies[0];
+    $('species-select').value = especieActual.id;
+    $('param-r').value = especieActual.tasa_r_base;
+    $('val-r').innerText = especieActual.tasa_r_base;
+    $('param-k').value = especieActual.capacidad_k_base;
+    $('val-k').innerText = especieActual.capacidad_k_base;
 
-    document.getElementById('param-r').value = esp.tasa_r_base;
-    document.getElementById('val-r').innerText = esp.tasa_r_base;
-    document.getElementById('param-k').value = esp.capacidad_k_base;
-    document.getElementById('val-k').innerText = esp.capacidad_k_base;
-
-    inicializarTimelinePorEspecie(esp);
+    inicializarTimelinePorEspecie(especieActual, timelineReal);
     cargarSlidersDesdeAnio(1);
     aplicarMorfologiaEspecie();
     actualizarExplicacionModelo();
+    renderizarRangosEspecie();
     reiniciarSimulacion();
 }
 
+/** Muestra junto a cada slider el rango óptimo y crítico de la especie (de la investigación). */
+function renderizarRangosEspecie() {
+    const u = AG.obtenerUmbrales(especieActual);
+    const mapa = { luz: 'luz', agua: 'agua', temp: 'temperatura', nut: 'nutrientes', ph: 'ph', co2: 'co2' };
+    Object.entries(mapa).forEach(([clave, variable]) => {
+        const el = $(`rango-${clave}`);
+        if (el) el.innerText = `óptimo ${u[variable].optimo_min}–${u[variable].optimo_max} · crítico <${u[variable].critico_min} / >${u[variable].critico_max} · letal ≤${u[variable].letal_min} / ≥${u[variable].letal_max}`;
+    });
+    $('rango-tmin').innerText = `daño desde ${u.tmin.critico_min} °C · letal ≤ ${u.tmin.letal_min} °C (helada)`;
+}
+
 async function guardarSimulacionEnMySQL() {
-    const nombre = document.getElementById('sim-name').value.trim() || `Simulación 7 Años ${especieActual.nombre_comun}`;
-    const resumenClima = timelineAnios.map(a => `A${a.anio}(💧${a.agua}%,🌡️${a.temp}°)`).join(' ');
-    const notasUsuario = document.getElementById('sim-notes').value.trim();
+    const nombre = $('sim-name').value.trim() || `Simulación 7 Años ${especieActual.nombre_comun}${contextoGeo ? ' en ' + contextoGeo.ubicacion.nombre : ''}`;
+    const resumenClima = timelineAnios.map(a => `A${a.anio}${a.anioReal ? '/' + a.anioReal : ''}(💧${a.agua}%,🌡️${a.temp}°,❄️${a.tmin}°)`).join(' ');
+    const notasUsuario = $('sim-notes').value.trim();
+    const anioCurso = timelineAnios[obtenerAnioDesdeTick(currentDay) - 1];
 
     const payload = {
         nombre,
         especie_id: especieActual.id,
-        modelo_matematico: document.getElementById('model-select').value,
-        tasa_r: parseFloat(document.getElementById('param-r').value),
-        capacidad_k: parseFloat(document.getElementById('param-k').value),
-        luz: parseFloat(document.getElementById('param-luz').value),
-        agua: parseFloat(document.getElementById('param-agua').value),
-        temperatura: parseFloat(document.getElementById('param-temp').value),
-        nutrientes: parseFloat(document.getElementById('param-nut').value),
-        co2: parseFloat(document.getElementById('param-co2').value),
+        modelo_matematico: $('model-select').value,
+        tasa_r: parseFloat($('param-r').value),
+        capacidad_k: parseFloat($('param-k').value),
+        luz: anioCurso.luz,
+        agua: anioCurso.agua,
+        temperatura: anioCurso.temp,
+        temp_minima: anioCurso.tmin,
+        nutrientes: anioCurso.nut,
+        ph: anioCurso.ph,
+        co2: anioCurso.co2,
         biomasa_final: estadoA.biomasa,
         altura_final: estadoA.altura,
-        estres_promedio: estadoA.estresGlobal,
+        estres_promedio: estadoA.estresPromedio,
         icr_promedio: estadoA.icr,
+        danio_final: estadoA.danio,
+        danio_permanente: estadoA.danioPermanente,
+        estado_final: estadoA.estado.id,
         dias_simulados: Math.max(1, tickADiasReales(currentDay)),
         dias_estimados_cosecha: estadoA.diasCosecha + tickADiasReales(currentDay),
         es_escenario_ab: abModeActive ? 1 : 0,
-        notas: `${notasUsuario} | Clima 7 Años: ${resumenClima}`,
+        notas: `${notasUsuario} | Clima 7 años: ${resumenClima}`,
         mediciones: medicionesCorrida,
-        decisiones: decisionesCorrida
+        decisiones: decisionesCorrida,
+        analisis_geo: contextoGeo?.analisis || null
     };
 
     try {
-        const res = await fetch(`${API_BASE}/simulaciones`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Error al guardar');
-        alert(`✅ Simulación guardada en MySQL con ID #${data.id}`);
-        document.getElementById('save-modal').classList.add('hidden');
+        const data = await apiPost('/simulaciones', payload);
+        alert(`✅ Simulación guardada en MySQL con ID #${data.id}${data.analisis_id ? ` (análisis geoespacial #${data.analisis_id})` : ''}`);
+        $('save-modal').classList.add('hidden');
+        observatorio.refrescarGuardados();
     } catch (err) {
         alert(`⚠️ Error al guardar en MySQL: ${err.message}`);
     }
 }
 
 async function abrirModalReportes() {
-    document.getElementById('reports-modal').classList.remove('hidden');
+    $('reports-modal').classList.remove('hidden');
     try {
-        const [resRep, resHist] = await Promise.all([
-            fetch(`${API_BASE}/reportes`),
-            fetch(`${API_BASE}/simulaciones`)
-        ]);
-        const rep = await resRep.json();
-        const hist = await resHist.json();
-
+        const [rep, hist] = await Promise.all([apiGet('/reportes'), apiGet('/simulaciones')]);
         if (rep.resumen_global) {
-            document.getElementById('report-kpis').innerHTML = `
-                <div class="kpi-card" style="flex:1"><span class="kpi-label">Total Corridas en MySQL</span><strong>${rep.resumen_global.total_simulaciones}</strong></div>
+            $('report-kpis').innerHTML = `
+                <div class="kpi-card" style="flex:1"><span class="kpi-label">Total Corridas</span><strong>${rep.resumen_global.total_simulaciones}</strong></div>
+                <div class="kpi-card" style="flex:1"><span class="kpi-label">Con datos reales (geo)</span><strong>${rep.resumen_global.simulaciones_geo ?? 0}</strong></div>
                 <div class="kpi-card" style="flex:1"><span class="kpi-label">Récord Biomasa</span><strong>${rep.resumen_global.record_biomasa} g</strong></div>
-                <div class="kpi-card" style="flex:1"><span class="kpi-label">Tiempo Promedio Madurez</span><strong>${rep.resumen_global.promedio_madurez_global} días</strong></div>
-            `;
+                <div class="kpi-card" style="flex:1"><span class="kpi-label">Madurez Promedio</span><strong>${rep.resumen_global.promedio_madurez_global} días</strong></div>`;
         }
-
-        document.querySelector('#table-top5 tbody').innerHTML = (rep.top5_biomasa || []).map(r => `
-            <tr>
-                <td>#${r.id}</td>
-                <td>${r.nombre}</td>
-                <td>${r.nombre_comun}</td>
-                <td>${r.modelo_matematico}</td>
-                <td><b>${r.biomasa_final} g</b></td>
-                <td>${r.altura_final} m</td>
-                <td>${r.estres_promedio}%</td>
-            </tr>
-        `).join('');
-
-        document.querySelector('#table-efficiency tbody').innerHTML = (rep.eficiencia_especies || []).map((e, idx) => `
-            <tr>
-                <td>${idx === 0 ? '🏆 ' : ''}${e.nombre_comun}</td>
-                <td>${e.total_corridas}</td>
-                <td>${e.biomasa_promedio} g</td>
-                <td><b>${e.eficiencia_diaria} g/día</b></td>
-                <td>${e.tiempo_promedio_madurez} días</td>
-            </tr>
-        `).join('');
-
-        document.querySelector('#table-history tbody').innerHTML = (hist || []).map(s => `
-            <tr>
-                <td>${(s.fecha_creacion || '').slice(0, 10)}</td>
-                <td>${s.nombre}</td>
-                <td>${s.nombre_comun}</td>
-                <td>${s.modelo_matematico}</td>
-                <td>${s.biomasa_final} g</td>
-                <td><button class="btn-load-sim" data-id="${s.id}" style="padding:4px 8px;">🔄 Cargar</button></td>
-            </tr>
-        `).join('');
-
-        document.querySelectorAll('.btn-load-sim').forEach(btn => {
-            btn.addEventListener('click', () => cargarSimulacionHistorica(btn.dataset.id));
-        });
+        $('table-top5').querySelector('tbody').innerHTML = (rep.top5_biomasa || []).map(r => `
+            <tr><td>#${r.id}</td><td>${r.nombre}</td><td>${r.nombre_comun}</td><td>${r.ubicacion_nombre || '—'}</td><td>${r.modelo_matematico}</td>
+            <td><b>${r.biomasa_final} g</b></td><td>${r.estado_final}</td><td>${r.estres_promedio}%</td></tr>`).join('');
+        $('table-efficiency').querySelector('tbody').innerHTML = (rep.eficiencia_especies || []).map((e, idx) => `
+            <tr><td>${idx === 0 ? '🏆 ' : ''}${e.nombre_comun}</td><td>${e.total_corridas}</td><td>${e.biomasa_promedio} g</td>
+            <td><b>${e.eficiencia_diaria} g/día</b></td><td>${e.tiempo_promedio_madurez} días</td><td>${e.corridas_muertas}</td></tr>`).join('');
+        $('table-sitios').querySelector('tbody').innerHTML = (rep.mejores_sitios || []).map(s => `
+            <tr><td>${s.nombre} (${s.pais || ''})</td><td>${s.nombre_comun}</td><td><b>${s.idoneidad}</b> ${s.clase_idoneidad}</td><td>${s.ocurrencias_gbif ?? '—'}</td><td>${(s.fecha_creacion || '').slice(0, 10)}</td></tr>`).join('')
+            || '<tr><td colspan="5">Aún no hay análisis geoespaciales guardados.</td></tr>';
+        $('table-history').querySelector('tbody').innerHTML = (hist || []).map(s => `
+            <tr><td>${(s.fecha_creacion || '').slice(0, 10)}</td><td>${s.nombre}</td><td>${s.nombre_comun}</td><td>${s.ubicacion_nombre || '—'}</td>
+            <td>${s.modelo_matematico}</td><td>${s.biomasa_final} g</td>
+            <td><button class="btn-load-sim" data-id="${s.id}" style="padding:4px 8px;">🔄 Cargar</button></td></tr>`).join('');
+        document.querySelectorAll('.btn-load-sim').forEach(btn => btn.addEventListener('click', () => cargarSimulacionHistorica(btn.dataset.id)));
     } catch (err) {
-        document.getElementById('report-kpis').innerHTML = `<p style="color:#f39c12">Verifica que Apache y MySQL estén activos en XAMPP.</p>`;
+        $('report-kpis').innerHTML = `<p style="color:#f39c12">Verifica que Apache y MySQL estén activos en XAMPP (${err.message}).</p>`;
     }
 }
 
 async function cargarSimulacionHistorica(id) {
     try {
-        const res = await fetch(`${API_BASE}/simulaciones/${id}`);
-        const sim = await res.json();
-        document.getElementById('species-select').value = sim.especie_id;
-        aplicarEspecieSeleccionada(sim.especie_id);
-
-        document.getElementById('model-select').value = sim.modelo_matematico;
+        const sim = await apiGet(`/simulaciones/${id}`);
+        const tl = sim.analisis_geo?.params_simulacion?.timeline || null;
+        contextoGeo = tl ? { ubicacion: { nombre: sim.analisis_geo.ubicacion_nombre, lat: +sim.analisis_geo.latitud, lon: +sim.analisis_geo.longitud, periodo: sim.analisis_geo.periodo_clima }, analisis: null } : null;
+        timelineB = null;
+        aplicarEspecieSeleccionada(sim.especie_id, tl);
+        if (!tl) {
+            timelineAnios.forEach(a => Object.assign(a, {
+                luz: +sim.luz, agua: +sim.agua, temp: +sim.temperatura, nut: +sim.nutrientes, co2: +sim.co2,
+                ...(sim.ph !== null ? { ph: +sim.ph } : {}), ...(sim.temp_minima !== null ? { tmin: +sim.temp_minima } : {})
+            }));
+            cargarSlidersDesdeAnio(1);
+        }
+        $('model-select').value = sim.modelo_matematico;
         actualizarExplicacionModelo();
-
-        document.getElementById('param-r').value = sim.tasa_r;
-        document.getElementById('val-r').innerText = sim.tasa_r;
-        document.getElementById('param-k').value = sim.capacidad_k;
-        document.getElementById('val-k').innerText = sim.capacidad_k;
-
-        document.getElementById('reports-modal').classList.add('hidden');
+        $('param-r').value = sim.tasa_r;
+        $('val-r').innerText = sim.tasa_r;
+        $('param-k').value = sim.capacidad_k;
+        $('val-k').innerText = sim.capacidad_k;
+        $('reports-modal').classList.add('hidden');
+        actualizarBannerGeo();
         reiniciarSimulacion();
     } catch (e) {
         console.error(e);
     }
 }
 
+/* =====================================================================
+ *  RAYCASTING DE LA PARCELA
+ * ===================================================================== */
+
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let selectedMesh = null;
 let selectedAgaveGroup = null;
-let originalEmissive = new THREE.Color(0x000000);
+const originalEmissive = new THREE.Color(0x000000);
 
 function actualizarPanelRaycaster() {
     if (!selectedMesh) return;
     const data = selectedMesh.userData;
     const agave = data.agaveRef;
     selectedAgaveGroup = agave;
-
     const esB = data.escenario === 'B' && abModeActive;
     const est = esB ? estadoB : estadoA;
     const espInfo = esB ? especieB : especieActual;
-
     const bonoDesquiote = (agave && agave.userData.quioteCortado) ? 1.12 : 1.0;
     const biomasaEfectivaPlanta = +(est.biomasa * bonoDesquiote).toFixed(1);
 
-    document.getElementById('info-name').innerText = data.name;
-    document.getElementById('info-species').innerText = `${espInfo.nombre_comun} (${espInfo.nombre_cientifico})`;
-    document.getElementById('info-type').innerText = data.type;
-    document.getElementById('info-growth').innerText = est.muerta ? '0 (Muerta)' : Math.round(est.fraccion * 100);
-    document.getElementById('info-stress').innerText = est.estresGlobal;
+    $('info-name').innerText = data.name;
+    $('info-species').innerText = `${espInfo.nombre_comun} (${espInfo.nombre_cientifico})`;
+    $('info-type').innerText = data.type;
+    $('info-growth').innerText = est.muerta ? '0 (Muerta)' : Math.round(est.fraccion * 100);
+    $('info-stress').innerText = est.estresGlobal;
+    $('info-damage').innerText = `${est.danio}% (${est.estado.etiqueta})`;
+    $('info-biomass-part').innerText = (biomasaEfectivaPlanta * data.biomassShare).toFixed(1);
+    $('info-biomass-pct').innerText = Math.round(data.biomassShare * 100);
+    $('info-desc').innerText = data.desc;
 
-    const aporteGramos = (biomasaEfectivaPlanta * data.biomassShare).toFixed(1);
-    document.getElementById('info-biomass-part').innerText = aporteGramos;
-    document.getElementById('info-biomass-pct').innerText = Math.round(data.biomassShare * 100);
-    document.getElementById('info-desc').innerText = data.desc;
-
-    const statusQuioteEl = document.getElementById('info-quiote-status');
-    const btnCut = document.getElementById('btn-cut-quiote');
+    const statusQuioteEl = $('info-quiote-status');
+    const btnCut = $('btn-cut-quiote');
     const quioteYaEmergio = est.fraccion > 0.62 && !est.muerta;
-
-    if (statusQuioteEl && btnCut && agave) {
-        if (agave.userData.quioteCortado) {
-            statusQuioteEl.innerText = '✂️ Desquiotado (+12% biomasa en piña)';
-            btnCut.classList.remove('hidden');
-            btnCut.disabled = true;
-            btnCut.innerText = '✅ Quiote ya cortado en esta planta';
-        } else if (quioteYaEmergio) {
-            statusQuioteEl.innerText = '🌿 Quiote emergido (listo para corte)';
-            btnCut.classList.remove('hidden');
-            btnCut.disabled = false;
-            btnCut.innerText = `✂️ Cortar Quiote de Planta #${agave.userData.idAgave}`;
-        } else {
-            statusQuioteEl.innerText = est.muerta ? '💀 Planta sin actividad biológica' : '🌱 Aún sin quiote (emerge al 62% de madurez)';
-            btnCut.classList.add('hidden');
-        }
+    if (agave.userData.quioteCortado) {
+        statusQuioteEl.innerText = '✂️ Desquiotado (+12% biomasa en piña)';
+        btnCut.classList.remove('hidden');
+        btnCut.disabled = true;
+        btnCut.innerText = '✅ Quiote ya cortado en esta planta';
+    } else if (quioteYaEmergio) {
+        statusQuioteEl.innerText = '🌿 Quiote emergido (listo para corte)';
+        btnCut.classList.remove('hidden');
+        btnCut.disabled = false;
+        btnCut.innerText = `✂️ Cortar Quiote de Planta #${agave.userData.idAgave}`;
+    } else {
+        statusQuioteEl.innerText = est.muerta ? '💀 Planta sin actividad biológica' : '🌱 Aún sin quiote (emerge al 62% de madurez)';
+        btnCut.classList.add('hidden');
     }
 }
 
-const btnCutQuiote = document.getElementById('btn-cut-quiote');
-if (btnCutQuiote) {
-    btnCutQuiote.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (!selectedAgaveGroup) return;
-        selectedAgaveGroup.userData.quioteCortado = true;
-        selectedAgaveGroup.userData.quiote.scale.set(0.0001, 0.0001, 0.0001);
-        selectedAgaveGroup.userData.quiote.visible = false;
-        actualizarPanelRaycaster();
-    });
-}
+$('btn-cut-quiote').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!selectedAgaveGroup) return;
+    selectedAgaveGroup.userData.quioteCortado = true;
+    selectedAgaveGroup.userData.quiote.scale.set(0.0001, 0.0001, 0.0001);
+    selectedAgaveGroup.userData.quiote.visible = false;
+    actualizarPanelRaycaster();
+});
 
-window.addEventListener('pointerdown', (event) => {
-    if (event.target.closest('#controls-panel') || event.target.closest('#analytics-panel') || event.target.closest('#timeline-bar') || event.target.closest('#info-panel') || event.target.closest('.modal-overlay')) return;
-
+renderer.domElement.addEventListener('pointerdown', (event) => {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(interactableObjects, false);
 
+    if (selectedMesh && selectedMesh.material) selectedMesh.material.emissive.copy(originalEmissive);
     if (intersects.length > 0) {
-        if (selectedMesh && selectedMesh.material) selectedMesh.material.emissive.copy(originalEmissive);
         selectedMesh = intersects[0].object;
-        if (selectedMesh.material) {
-            originalEmissive.copy(selectedMesh.material.emissive);
-            selectedMesh.material.emissive.setHex(0x444444);
-        }
+        originalEmissive.copy(selectedMesh.material.emissive);
+        selectedMesh.material.emissive.setHex(0x444444);
         actualizarPanelRaycaster();
-        document.getElementById('info-panel').classList.remove('hidden');
+        $('info-panel').classList.remove('hidden');
     } else {
-        if (selectedMesh && selectedMesh.material) selectedMesh.material.emissive.copy(originalEmissive);
         selectedMesh = null;
         selectedAgaveGroup = null;
-        document.getElementById('info-panel').classList.add('hidden');
+        $('info-panel').classList.add('hidden');
     }
 });
 
+/* =====================================================================
+ *  CONTROLES
+ * ===================================================================== */
+
 function bindSlider(id, labelId, esClimaTimeline = false) {
-    const el = document.getElementById(id);
-    const lbl = document.getElementById(labelId);
+    const el = $(id);
+    const lbl = $(labelId);
     el.addEventListener('input', () => {
         lbl.innerText = el.value;
-        if (esClimaTimeline) {
-            guardarSlidersEnAnioActivo();
-        } else {
-            recalcularHistorialGrafica();
-        }
+        if (esClimaTimeline) guardarSlidersEnAnioActivo();
+        else recalcularHistorialGrafica();
     });
 }
 
-bindSlider('param-r', 'val-r', false);
-bindSlider('param-k', 'val-k', false);
-bindSlider('param-luz', 'val-luz', true);
-bindSlider('param-agua', 'val-agua', true);
-bindSlider('param-temp', 'val-temp', true);
-bindSlider('param-nut', 'val-nut', true);
-bindSlider('param-co2', 'val-co2', true);
-bindSlider('param-agua-b', 'val-agua-b', false);
-bindSlider('param-temp-b', 'val-temp-b', false);
+bindSlider('param-r', 'val-r');
+bindSlider('param-k', 'val-k');
+SLIDERS_CLIMA.forEach(([, slider, etiqueta]) => bindSlider(slider, etiqueta, true));
+bindSlider('param-agua-b', 'val-agua-b');
+bindSlider('param-temp-b', 'val-temp-b');
 
-document.getElementById('growth-speed').addEventListener('input', (e) => {
+$('growth-speed').addEventListener('input', (e) => {
     simSpeed = parseFloat(e.target.value);
-    document.getElementById('val-speed').innerText = simSpeed;
+    $('val-speed').innerText = simSpeed;
 });
 
-document.getElementById('species-select').addEventListener('change', (e) => {
+$('species-select').addEventListener('change', (e) => {
+    contextoGeo = null;
+    timelineB = null;
+    actualizarBannerGeo();
     aplicarEspecieSeleccionada(e.target.value);
 });
 
-document.getElementById('model-select').addEventListener('change', () => {
+$('model-select').addEventListener('change', () => {
     actualizarExplicacionModelo();
     recalcularHistorialGrafica();
 });
 
-const selectBElement = document.getElementById('species-b-select');
-if (selectBElement) {
-    selectBElement.addEventListener('change', (e) => {
-        especieB = catalogoEspecies.find(esp => esp.id === +e.target.value) || catalogoEspecies[0];
-        aplicarMorfologiaEspecie();
-        recalcularHistorialGrafica();
-    });
-}
-
-document.getElementById('model-b-select').addEventListener('change', recalcularHistorialGrafica);
-
-document.getElementById('toggle-ab').addEventListener('change', (e) => {
-    abModeActive = e.target.checked;
-    document.getElementById('ab-controls').classList.toggle('hidden', !abModeActive);
-    growthChart.data.datasets[1].hidden = !abModeActive;
+$('species-b-select').addEventListener('change', (e) => {
+    especieB = catalogoEspecies.find(esp => esp.id === +e.target.value) || catalogoEspecies[0];
     aplicarMorfologiaEspecie();
     recalcularHistorialGrafica();
 });
 
-const btnLive = document.getElementById('btn-tl-live');
-if (btnLive) {
-    btnLive.addEventListener('click', () => {
-        anioSeleccionadoParaEdicion = null;
-        btnLive.classList.add('hidden');
-        document.getElementById('timeline-edit-status').innerText = '💡 Haz clic en una línea anual para editar o ver su clima guardado';
-        document.getElementById('tl-detail-text').innerText = 'Modo en vivo: los sliders muestran automáticamente el clima del año en curso.';
-        cargarSlidersDesdeAnio(obtenerAnioDesdeTick(currentDay));
-        renderizarNodosTimeline();
-    });
+$('model-b-select').addEventListener('change', recalcularHistorialGrafica);
+
+function activarAB(activo) {
+    abModeActive = activo;
+    $('toggle-ab').checked = activo;
+    $('ab-controls').classList.toggle('hidden', !activo);
+    $('ab-manual').classList.toggle('hidden', !!timelineB);
+    $('ab-geo-nota').classList.toggle('hidden', !timelineB);
+    growthChart.data.datasets[1].hidden = !activo;
+    aplicarMorfologiaEspecie();
+    recalcularHistorialGrafica();
 }
 
-document.getElementById('btn-pause-growth').addEventListener('click', (e) => {
+$('toggle-ab').addEventListener('change', (e) => {
+    if (!e.target.checked) {
+        timelineB = null;
+        if (contextoGeo) contextoGeo.ubicacionB = null;
+        actualizarBannerGeo();
+    }
+    activarAB(e.target.checked);
+});
+
+$('btn-tl-live').addEventListener('click', () => {
+    anioSeleccionadoParaEdicion = null;
+    $('btn-tl-live').classList.add('hidden');
+    $('timeline-edit-status').innerText = '💡 Haz clic en una línea anual para editar o ver su clima';
+    $('tl-detail-text').innerText = 'Modo en vivo: los sliders muestran automáticamente el clima del año en curso.';
+    cargarSlidersDesdeAnio(obtenerAnioDesdeTick(currentDay));
+    renderizarNodosTimeline();
+});
+
+$('btn-pause-growth').addEventListener('click', (e) => {
     isGrowing = !isGrowing;
     e.target.innerText = isGrowing ? '⏸️ Pausar' : '▶️ Reanudar';
 });
@@ -1061,11 +913,7 @@ function reiniciarSimulacion() {
     medicionesCorrida = [];
     decisionesCorrida = [];
     ultimaAlertaEmitida = '';
-    timelineAnios.forEach(a => {
-        a.biomasaGuardada = null;
-        a.estresGuardado = null;
-        a.plantaMuertaEnAnio = false;
-    });
+    timelineAnios.forEach(a => Object.assign(a, { biomasaGuardada: null, danioGuardado: null, estadoAnio: null, plantaMuertaEnAnio: false }));
     todosLosAgaves.forEach(agave => {
         agave.userData.quioteCortado = false;
         agave.userData.quiote.visible = true;
@@ -1074,46 +922,41 @@ function reiniciarSimulacion() {
     growthChart.data.datasets.forEach(d => d.data = []);
     growthChart.update();
     isGrowing = true;
-    document.getElementById('btn-pause-growth').innerText = '⏸️ Pausar';
+    $('btn-pause-growth').innerText = '⏸️ Pausar';
     renderizarNodosTimeline();
 }
 
-document.getElementById('btn-restart').addEventListener('click', reiniciarSimulacion);
-document.getElementById('btn-camera').addEventListener('click', () => {
+$('btn-restart').addEventListener('click', reiniciarSimulacion);
+$('btn-camera').addEventListener('click', () => {
     camera.position.copy(initialCameraPos);
     controls.target.set(0, 3, 0);
 });
 
-document.getElementById('btn-save-sim').addEventListener('click', () => document.getElementById('save-modal').classList.remove('hidden'));
-document.getElementById('btn-close-save').addEventListener('click', () => document.getElementById('save-modal').classList.add('hidden'));
-document.getElementById('btn-confirm-save').addEventListener('click', guardarSimulacionEnMySQL);
+$('btn-save-sim').addEventListener('click', () => $('save-modal').classList.remove('hidden'));
+$('btn-close-save').addEventListener('click', () => $('save-modal').classList.add('hidden'));
+$('btn-confirm-save').addEventListener('click', guardarSimulacionEnMySQL);
+$('btn-reports').addEventListener('click', abrirModalReportes);
+$('btn-close-reports').addEventListener('click', () => $('reports-modal').classList.add('hidden'));
+document.querySelectorAll('.btn-qa-open').forEach(b => b.addEventListener('click', () => $('qa-modal').classList.remove('hidden')));
+$('btn-close-qa').addEventListener('click', () => $('qa-modal').classList.add('hidden'));
 
-document.getElementById('btn-reports').addEventListener('click', abrirModalReportes);
-document.getElementById('btn-close-reports').addEventListener('click', () => document.getElementById('reports-modal').classList.add('hidden'));
-
-document.getElementById('btn-qa').addEventListener('click', () => document.getElementById('qa-modal').classList.remove('hidden'));
-document.getElementById('btn-close-qa').addEventListener('click', () => document.getElementById('qa-modal').classList.add('hidden'));
-
-document.getElementById('btn-export-csv').addEventListener('click', () => {
+$('btn-export-csv').addEventListener('click', () => {
     if (medicionesCorrida.length === 0) {
         alert('Deja correr la simulación unos segundos para acumular datos antes de exportar.');
         return;
     }
-    const headers = 'Anio,Dia_Real,Altura_m,Biomasa_g,Num_Hojas,ICR,Estres_Hidrico,Estres_Termico,Estres_Global\n';
+    const headers = 'Anio,Dia_Real,Altura_m,Biomasa_g,Num_Hojas,ICR,Estres_Hidrico,Estres_Termico,Estres_Global,Danio_Acumulado\n';
     const rows = medicionesCorrida.map(m =>
-        `${Math.min(7, Math.floor(m.tick_dia / 365) + 1)},${m.tick_dia},${m.altura},${m.biomasa},${m.num_hojas},${m.icr},${m.estres_hidrico},${m.estres_termico},${m.estres_global}`
+        `${Math.min(7, Math.floor(m.tick_dia / 365) + 1)},${m.tick_dia},${m.altura},${m.biomasa},${m.num_hojas},${m.icr},${m.estres_hidrico},${m.estres_termico},${m.estres_global},${m.danio_acumulado}`
     ).join('\n');
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = `reporte_7anios_${especieActual.nombre_comun.replace(/\s+/g, '_')}.csv`;
     a.click();
 });
 
-document.getElementById('btn-export-pdf').addEventListener('click', () => {
-    window.print();
-});
+$('btn-export-pdf').addEventListener('click', () => window.print());
 
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -1121,92 +964,128 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+/* =====================================================================
+ *  INTEGRACIÓN CON EL OBSERVATORIO (globo)
+ * ===================================================================== */
+
+function actualizarBannerGeo() {
+    const banner = $('geo-context');
+    if (!contextoGeo) {
+        banner.classList.add('hidden');
+        return;
+    }
+    const u = contextoGeo.ubicacion;
+    banner.classList.remove('hidden');
+    $('geo-context-texto').innerHTML = `📍 <b>${u.nombre}</b> · clima real NASA POWER ${u.periodo || ''}`
+        + (contextoGeo.ubicacionB ? `<br>⚖️ Fila B: <b>${contextoGeo.ubicacionB.nombre}</b>` : '');
+}
+
+function cambiarModo(nuevo) {
+    modo = nuevo;
+    document.body.classList.toggle('modo-globo', modo === 'globo');
+    document.body.classList.toggle('modo-parcela', modo === 'parcela');
+    $('btn-modo-globo').classList.toggle('activo', modo === 'globo');
+    $('btn-modo-parcela').classList.toggle('activo', modo === 'parcela');
+    if (modo === 'globo') {
+        observatorio.activar();
+    } else {
+        observatorio.desactivar();
+        clock.getDelta();
+    }
+}
+
+function lanzarSimulacionGeo(op) {
+    contextoGeo = { ubicacion: op.ubicacion, analisis: op.analisis, ubicacionB: op.ubicacionB || null };
+    timelineB = op.timelineB || null;
+    aplicarEspecieSeleccionada(op.especieId, op.timeline);
+    if (timelineB) {
+        especieB = especieActual;
+        $('species-b-select').value = especieB.id;
+        $('model-b-select').value = $('model-select').value;
+        activarAB(true);
+    } else if (abModeActive) {
+        activarAB(false);
+    }
+    actualizarBannerGeo();
+    $('timeline-edit-status').innerText = `🌍 Línea del tiempo con clima real (${op.ubicacion.periodo || 'NASA POWER'})`;
+    cambiarModo('parcela');
+    reiniciarSimulacion();
+}
+
+$('btn-modo-globo').addEventListener('click', () => cambiarModo('globo'));
+$('btn-modo-parcela').addEventListener('click', () => cambiarModo('parcela'));
+$('btn-volver-globo').addEventListener('click', () => cambiarModo('globo'));
+$('btn-quitar-geo').addEventListener('click', () => {
+    contextoGeo = null;
+    timelineB = null;
+    actualizarBannerGeo();
+    if (abModeActive) activarAB(false);
+    aplicarEspecieSeleccionada(especieActual.id);
+});
+
+const observatorio = iniciarObservatorio({
+    obtenerCatalogo: () => catalogoEspecies,
+    lanzarSimulacionGeo,
+    cambiarModo
+});
+
+/* =====================================================================
+ *  BUCLE DE ANIMACIÓN DE LA PARCELA
+ * ===================================================================== */
+
 const clock = new THREE.Clock();
 let windClock = 0;
 let ultimoAnioMostrado = 1;
 const colorEstres = new THREE.Color(0xcc4422);
 const colorMuerto = new THREE.Color(0x4a3219);
 
-function obtenerParamsBaseA() {
-    return {
-        modelo: document.getElementById('model-select').value,
-        r: parseFloat(document.getElementById('param-r').value),
-        k: parseFloat(document.getElementById('param-k').value),
-        luz: parseFloat(document.getElementById('param-luz').value),
-        agua: parseFloat(document.getElementById('param-agua').value),
-        temp: parseFloat(document.getElementById('param-temp').value),
-        nut: parseFloat(document.getElementById('param-nut').value),
-        co2: parseFloat(document.getElementById('param-co2').value)
-    };
-}
-
-function obtenerParamsBaseB(paramsA, espReferenciaB) {
-    return {
-        ...paramsA,
-        r: (abModeActive && espReferenciaB.id !== especieActual.id) ? espReferenciaB.tasa_r_base : paramsA.r,
-        k: (abModeActive && espReferenciaB.id !== especieActual.id) ? espReferenciaB.capacidad_k_base : paramsA.k,
-        modelo: abModeActive ? document.getElementById('model-b-select').value : paramsA.modelo,
-        agua: abModeActive ? parseFloat(document.getElementById('param-agua-b').value) : paramsA.agua,
-        temp: abModeActive ? parseFloat(document.getElementById('param-temp-b').value) : paramsA.temp
-    };
-}
-
-function actualizarBarraEstres(idBarra, idTexto, valor) {
-    const bar = document.getElementById(idBarra);
-    document.getElementById(idTexto).innerText = `${valor}%`;
-    bar.style.width = `${valor}%`;
-    bar.style.background = valor > 40 ? '#e74c3c' : (valor > 20 ? '#f39c12' : '#2ecc71');
+function actualizarBarra(idBarra, idTexto, valor, umbralRojo = 40) {
+    const bar = $(idBarra);
+    $(idTexto).innerText = `${valor}%`;
+    bar.style.width = `${Math.min(100, valor)}%`;
+    bar.style.background = valor > umbralRojo ? '#e74c3c' : (valor > umbralRojo / 2 ? '#f39c12' : '#2ecc71');
 }
 
 function animate() {
     requestAnimationFrame(animate);
-    const delta = clock.getDelta();
+    if (modo !== 'parcela') return;
+    const delta = Math.min(0.1, clock.getDelta());   // tope: evita saltos (y colores extrapolados) al volver de una pestaña oculta
     windClock += delta;
 
-    if (isGrowing && currentDay < 140) {
-        currentDay = Math.min(140, currentDay + delta * simSpeed * 2.5);
+    if (isGrowing && currentDay < AG.TOTAL_TICKS) {
+        currentDay = Math.min(AG.TOTAL_TICKS, currentDay + delta * simSpeed * 2.5);
     }
 
     const anioCurso = obtenerAnioDesdeTick(currentDay);
     const diasRealesActuales = tickADiasReales(currentDay);
-    const pctTimeline = (currentDay / 140) * 100;
-    const fillBar = document.getElementById('timeline-progress-fill');
-    if (fillBar) fillBar.style.width = `${pctTimeline}%`;
-
-    const badgeAnio = document.getElementById('timeline-current-year');
-    if (badgeAnio) {
-        const aniosDecimales = (currentDay / TICKS_POR_ANIO).toFixed(1);
-        badgeAnio.innerText = `Día ${diasRealesActuales} / 2555 (${aniosDecimales} Años)`;
-    }
+    $('timeline-progress-fill').style.width = `${(currentDay / AG.TOTAL_TICKS) * 100}%`;
+    const anioReal = timelineAnios[anioCurso - 1]?.anioReal;
+    $('timeline-current-year').innerText = `Día ${diasRealesActuales} / 2555 (${(currentDay / AG.TICKS_POR_ANIO).toFixed(1)} Años)${anioReal ? ` · clima ${anioReal}` : ''}`;
 
     if (anioCurso !== ultimoAnioMostrado) {
         ultimoAnioMostrado = anioCurso;
-        if (anioSeleccionadoParaEdicion === null) {
-            cargarSlidersDesdeAnio(anioCurso);
-        }
+        if (anioSeleccionadoParaEdicion === null) cargarSlidersDesdeAnio(anioCurso);
         renderizarNodosTimeline();
     }
 
-    const luzVal = parseFloat(document.getElementById('param-luz').value) / 100;
+    const climaAnio = timelineAnios[anioCurso - 1];
+    const luzVal = climaAnio.luz / 100;
     dirLight.intensity = 0.4 + luzVal * 1.8;
     const bg = colorNoche.clone().lerp(colorDia, luzVal);
     scene.background = bg;
     scene.fog.color = bg;
+    materialTerreno.color.copy(colorSueloSeco).lerp(colorSueloHumedo, Math.min(1, climaAnio.agua / 80));
 
     const paramsA = obtenerParamsBaseA();
-    estadoA = simularCrecimientoAcumulado(paramsA, currentDay, especieActual, true);
-
-    const espReferenciaB = abModeActive ? especieB : especieActual;
-    const paramsB = obtenerParamsBaseB(paramsA, espReferenciaB);
-    estadoB = simularCrecimientoAcumulado(paramsB, currentDay, espReferenciaB, false);
+    estadoA = AG.simularCiclo(paramsA, currentDay);
+    sincronizarTimelineConResultado(estadoA);
+    estadoB = AG.simularCiclo(obtenerParamsBaseB(paramsA), currentDay);
 
     todosLosAgaves.forEach((agave, idx) => {
         const esB = (agave.userData.escenario === 'B' && abModeActive);
         const est = esB ? estadoB : estadoA;
-        const espAgave = esB ? especieB : especieActual;
-        const morf = MORFOLOGIA_ESPECIES[espAgave.id] || MORFOLOGIA_ESPECIES[1];
-        const f = est.fraccion;
-
+        const morf = MORFOLOGIA_ESPECIES[(esB ? especieB : especieActual).id] || MORFOLOGIA_ESPECIES[1];
+        const f = est.fraccionVisual;
         const bonoPinaDesquiote = agave.userData.quioteCortado ? 1.12 : 1.0;
 
         const sPina = Math.min(1.15, Math.max(0.001, f * 1.35)) * morf.porteGeneral * bonoPinaDesquiote;
@@ -1215,71 +1094,52 @@ function animate() {
             ? 0.0001
             : Math.min(1, Math.max(0.001, (f - 0.62) * 2.65)) * morf.porteGeneral;
 
-        agave.userData.pina.scale.set(
-            sPina * morf.pinaAncho,
-            sPina * morf.pinaAlto,
-            sPina * morf.pinaAncho
-        );
-        agave.userData.pencasGroup.scale.set(sPencas, est.muerta ? sPencas * 0.55 : sPencas, sPencas);
+        agave.userData.pina.scale.set(sPina * morf.pinaAncho, sPina * morf.pinaAlto, sPina * morf.pinaAncho);
+        // Las pencas se marchitan (caen) en proporción al daño acumulado
+        const caida = est.muerta ? 0.45 : 1 - est.danio / 250;
+        agave.userData.pencasGroup.scale.set(sPencas, sPencas * caida, sPencas);
         agave.userData.quiote.visible = !agave.userData.quioteCortado && !est.muerta;
-        agave.userData.quiote.scale.set(
-            sQuiote * morf.quioteAncho,
-            sQuiote * morf.quioteAlto,
-            sQuiote * morf.quioteAncho
-        );
+        agave.userData.quiote.scale.set(sQuiote * morf.quioteAncho, sQuiote * morf.quioteAlto, sQuiote * morf.quioteAncho);
 
         const colorBaseEspecie = new THREE.Color(morf.colorHoja);
         const targetColor = est.muerta
             ? colorMuerto
-            : colorBaseEspecie.lerp(colorEstres, Math.min(1, est.estresGlobal / 75));
-        agave.userData.materialPencas.color.lerp(targetColor, delta * 3.0);
-
+            : colorBaseEspecie.lerp(colorEstres, Math.min(1, Math.max(est.estresGlobal / 100, est.danio / 70)));
+        agave.userData.materialPencas.color.lerp(targetColor, Math.min(1, delta * 3.0));
         agave.userData.pivotes.forEach((pivote, pIdx) => {
             pivote.rotation.z = est.muerta ? 0 : Math.sin(windClock * 2 + pIdx * 0.2 + idx) * 0.022;
         });
     });
 
     const tickEntero = Math.floor(currentDay);
-    document.getElementById('kpi-day').innerText = `${diasRealesActuales} d (A${anioCurso})`;
-    document.getElementById('kpi-height').innerText = estadoA.altura;
-    document.getElementById('kpi-biomass').innerText = estadoA.biomasa;
-    document.getElementById('kpi-leaves').innerText = `${estadoA.hojas} / ${estadoA.ramas}`;
-    document.getElementById('kpi-icr').innerText = estadoA.icr;
-    document.getElementById('kpi-harvest').innerText = estadoA.muerta ? '💀 Muerta' : `${estadoA.diasCosecha} d`;
+    $('kpi-day').innerText = `${diasRealesActuales} d (A${anioCurso})`;
+    $('kpi-height').innerText = estadoA.altura;
+    $('kpi-biomass').innerText = estadoA.biomasa;
+    $('kpi-leaves').innerText = `${estadoA.hojas} / ${estadoA.ramas}`;
+    $('kpi-icr').innerText = estadoA.icr;
+    $('kpi-harvest').innerText = estadoA.muerta ? '💀 Muerta' : `${estadoA.diasCosecha} d`;
 
-    actualizarBarraEstres('bar-s-water', 'lbl-s-water', estadoA.estresHidrico);
-    actualizarBarraEstres('bar-s-temp', 'lbl-s-temp', estadoA.estresTermico);
-    actualizarBarraEstres('bar-s-global', 'lbl-s-global', estadoA.estresGlobal);
+    actualizarBarra('bar-s-water', 'lbl-s-water', estadoA.estresHidrico);
+    actualizarBarra('bar-s-temp', 'lbl-s-temp', estadoA.estresTermico);
+    actualizarBarra('bar-s-global', 'lbl-s-global', estadoA.estresGlobal);
+    actualizarBarra('bar-s-damage', 'lbl-s-damage', estadoA.danio, 30);
+    $('lbl-estado').innerText = `${estadoA.estado.etiqueta} · recuperación: ${estadoA.estado.recuperacion}${estadoA.danioPermanente > 0 && !estadoA.muerta ? ` · daño permanente ${estadoA.danioPermanente}%` : ''}`;
+    $('lbl-estado').className = `estado-planta estado-${estadoA.estado.id}`;
 
     if (tickEntero % 5 === 0 && tickEntero !== lastRecordedTick) {
         lastRecordedTick = tickEntero;
-        medicionesCorrida.push({
-            tick_dia: diasRealesActuales,
-            altura: estadoA.altura,
-            biomasa: estadoA.biomasa,
-            num_hojas: estadoA.hojas,
-            num_ramas: estadoA.ramas,
-            icr: estadoA.icr,
-            estres_hidrico: estadoA.estresHidrico,
-            estres_termico: estadoA.estresTermico,
-            estres_global: estadoA.estresGlobal
-        });
-
-        growthChart.data.labels.push(`A${anioCurso}·${diasRealesActuales}d`);
-        growthChart.data.datasets[0].data.push(estadoA.biomasa);
-        growthChart.data.datasets[1].data.push(estadoB.biomasa);
-        growthChart.data.datasets[2].data.push(estadoA.estresGlobal);
+        medicionesCorrida.push(medicionDesdeEstado(estadoA, diasRealesActuales));
+        agregarPuntoGrafica(tickEntero, estadoA, estadoB);
         growthChart.update();
-
         evaluarMotorDecisiones(tickEntero);
         renderizarNodosTimeline();
     }
 
     if (selectedMesh) actualizarPanelRaycaster();
-
     controls.update();
     renderer.render(scene, camera);
 }
 
+cambiarModo('globo');
 cargarCatalogoEspecies();
 animate();
