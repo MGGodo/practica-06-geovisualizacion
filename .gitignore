@@ -1,0 +1,8 @@
+# Credenciales locales (copiar de api/config.example.php)
+api/config.php
+
+# Dependencias opcionales
+api/vendor/
+
+.DS_Store
+Thumbs.db

@@ -1,0 +1,10 @@
+# Rutas limpias: /api/geo/clima?lat=..&lon=.. → index.php (FlightPHP lee REQUEST_URI)
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
+
+# Protege la configuración y las librerías internas
+<FilesMatch "^(config\.php|config\.example\.php|db\.php|Flight\.php)$">
+    Require all denied
+</FilesMatch>

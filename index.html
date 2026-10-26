@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Práctica 05 - Laboratorio Bioinformático de Cultivo</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧬</text></svg>">
-    <link rel="stylesheet" href="style.css?v=3">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Práctica 06 - Observatorio Global de Cultivos</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌍</text></svg>">
+    <link rel="stylesheet" href="style.css?v=6">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
     <script type="importmap">
         {
             "imports": {
@@ -16,18 +17,163 @@
         }
     </script>
 </head>
-<body>
-    <!-- PANEL IZQUIERDO -->
-    <aside id="controls-panel">
+<body class="modo-globo">
+    <!-- LIENZOS 3D -->
+    <div id="globe-container" class="vista-3d"></div>
+    <div id="parcela-container" class="vista-3d"></div>
+    <div id="globo-tooltip" class="hidden"></div>
+
+    <!-- BARRA DE MODO -->
+    <nav id="mode-bar">
+        <button id="btn-modo-globo" class="activo">🌍 Observatorio Global</button>
+        <button id="btn-modo-parcela">🌱 Parcela 3D (Simulación)</button>
+        <button id="btn-reports" class="btn-accent">📊 Reportes</button>
+        <button class="btn-qa-open btn-dark">❓ Preguntas</button>
+    </nav>
+
+    <!-- ===================== MODO GLOBO ===================== -->
+    <aside id="geo-panel" class="panel solo-globo">
         <div class="panel-header">
-            <h1>🧬 Lab Bioinformático P05</h1>
+            <h1>🌍 Observatorio Global de Cultivos</h1>
+            <span id="geo-db-status" class="badge badge-warn">Conectando…</span>
+        </div>
+
+        <div class="control-section">
+            <label for="geo-buscar">Buscar lugar (Open-Meteo Geocoding):</label>
+            <div class="fila-buscar">
+                <input type="text" id="geo-buscar" placeholder="Ej. Jutiapa, Córdoba, Tequila…">
+                <button id="geo-buscar-btn">🔎</button>
+            </div>
+            <ul id="geo-resultados" class="lista-resultados"></ul>
+            <p class="nota">…o haz clic en cualquier punto del globo.</p>
+        </div>
+
+        <div class="control-section">
+            <label for="geo-especie">Especie objetivo:</label>
+            <select id="geo-especie"></select>
+            <div class="slider-row">
+                <label>Radio de búsqueda GBIF: <span><span id="geo-val-radio">100</span> km</span></label>
+                <input type="range" id="geo-radio" min="25" max="300" step="25" value="100">
+            </div>
+            <div id="gbif-resumen" class="nota">Cargando ocurrencias…</div>
+        </div>
+
+        <div class="control-section">
+            <h2>Capas</h2>
+            <div class="capas">
+                <label><input type="checkbox" id="capa-ocurrencias" checked> 🌿 Ocurrencias GBIF (puntos)</label>
+                <label><input type="checkbox" id="capa-densidad"> 🔥 Densidad GBIF (todos los registros)</label>
+                <label><input type="checkbox" id="capa-referencias" checked> 📍 Zonas de referencia</label>
+                <label><input type="checkbox" id="capa-guardados" checked> 💾 Análisis guardados</label>
+                <label><input type="checkbox" id="capa-reticula" checked> 🌐 Retícula 30°</label>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h2>Zonas de referencia</h2>
+            <div id="lista-referencias" class="chips"></div>
+        </div>
+
+        <div class="control-section ab-box">
+            <h2>⚖️ Comparador A/B geográfico</h2>
+            <p id="slot-a" class="slot slot-a"></p>
+            <p id="slot-b" class="slot slot-b"></p>
+            <div class="btn-grid">
+                <button id="btn-comparar-ab" class="btn-accent" disabled>⚖️ Comparar A/B</button>
+                <button id="btn-ejemplo-ab" class="btn-secondary">🇬🇹 vs 🇪🇸 Ejemplo</button>
+            </div>
+        </div>
+
+        <button id="btn-ranking" class="btn-primary btn-ancho">🏆 Ranking de idoneidad (especie × ubicación)</button>
+    </aside>
+
+    <aside id="geo-datos" class="panel solo-globo">
+        <div id="geo-placeholder">
+            <h2>📡 Datos reales del punto</h2>
+            <p class="nota">Haz clic en el globo, en una zona de referencia o busca un lugar. El servidor consultará en paralelo:</p>
+            <ul class="lista-fuentes">
+                <li>🛰️ <b>NASA POWER</b>: clima agroclimático 7 años (temperatura, lluvia, radiación)</li>
+                <li>🌦️ <b>Open-Meteo</b>: condiciones actuales y humedad del suelo</li>
+                <li>🪨 <b>SoilGrids</b>: pH, textura, carbono y nitrógeno del suelo</li>
+                <li>🌿 <b>GBIF</b>: ocurrencias de cada especie en el radio</li>
+                <li>🗺️ <b>Nominatim/OSM</b>: nombre del lugar</li>
+            </ul>
+            <p class="nota">Cada respuesta se guarda en caché MySQL para no repetir llamadas.</p>
+        </div>
+        <div id="geo-cargando" class="hidden"><div class="spinner"></div><p id="geo-cargando-texto"></p></div>
+        <p id="geo-error" class="nota-roja hidden"></p>
+
+        <div id="geo-contenido" class="hidden">
+            <h2 id="geo-lugar">—</h2>
+            <p id="geo-coords" class="nota"></p>
+            <p id="geo-cache-info" class="nota"></p>
+
+            <div id="idoneidad-box">
+                <div class="idoneidad-cabecera">
+                    <strong id="idoneidad-valor">—</strong>
+                    <div><span class="kpi-label">Índice de idoneidad (0-100)</span><b id="idoneidad-clase"></b></div>
+                </div>
+                <div id="idoneidad-factores"></div>
+                <p id="idoneidad-sim" class="nota"></p>
+            </div>
+
+            <div class="btn-grid acciones-geo">
+                <button id="btn-simular-aqui" class="btn-primary">▶️ Simular aquí (7 años reales)</button>
+                <button id="btn-guardar-analisis">💾 Guardar análisis</button>
+                <button id="btn-fijar-a" class="btn-a">Fijar como A</button>
+                <button id="btn-fijar-b" class="btn-b">Fijar como B</button>
+            </div>
+
+            <details open>
+                <summary>🧠 Decisiones geo-agronómicas</summary>
+                <ul id="geo-reglas" class="reglas"></ul>
+            </details>
+            <details open>
+                <summary>🏆 Especies del catálogo en este punto</summary>
+                <table class="mini-tabla"><thead><tr><th>#</th><th>Especie</th><th>Idon.</th><th>Sim. 7 años</th></tr></thead><tbody id="geo-ranking-especies"></tbody></table>
+            </details>
+            <details open>
+                <summary>🛰️ Clima histórico (NASA POWER)</summary>
+                <div id="geo-clima" class="datos-grid"></div>
+                <div class="chart-mini"><canvas id="geo-clima-chart"></canvas></div>
+            </details>
+            <details>
+                <summary>🌦️ Condiciones actuales (Open-Meteo)</summary>
+                <div id="geo-actual" class="datos-grid"></div>
+            </details>
+            <details>
+                <summary>🪨 Suelo (SoilGrids)</summary>
+                <div id="geo-suelo" class="datos-grid"></div>
+            </details>
+            <details>
+                <summary>🌿 Biodiversidad (GBIF)</summary>
+                <div id="geo-gbif"></div>
+            </details>
+            <details>
+                <summary>🎛️ Parámetros de simulación derivados</summary>
+                <div id="geo-params" class="datos-grid"></div>
+            </details>
+        </div>
+    </aside>
+
+    <!-- ===================== MODO PARCELA ===================== -->
+    <aside id="controls-panel" class="panel solo-parcela">
+        <div class="panel-header">
+            <h1>🌱 Parcela Experimental</h1>
             <span id="db-status" class="badge badge-warn">Conectando API...</span>
+        </div>
+
+        <div id="geo-context" class="geo-context hidden">
+            <p id="geo-context-texto"></p>
+            <div class="btn-grid">
+                <button id="btn-volver-globo" class="btn-small">🌍 Volver al globo</button>
+                <button id="btn-quitar-geo" class="btn-small btn-secondary">✖ Usar clima manual</button>
+            </div>
         </div>
 
         <div class="control-section">
             <label for="species-select">Especie (Catálogo MySQL):</label>
             <select id="species-select"></select>
-
             <label for="model-select">Modelo Matemático de Crecimiento:</label>
             <select id="model-select">
                 <option value="logistico">Logístico de Verhulst: dN/dt = r·N(1 - N/K)</option>
@@ -38,66 +184,81 @@
         </div>
 
         <div class="control-section">
-            <h2>Parámetros Genéticos y Ambientales (Escenario A)</h2>
-            
+            <h2>Parámetros (Escenario A)</h2>
             <div class="slider-row">
                 <label>Tasa Intrínseca (r): <span id="val-r">0.140</span></label>
                 <input type="range" id="param-r" min="0.05" max="0.30" step="0.005" value="0.140">
             </div>
             <div class="slider-row">
-                <label>Capacidad Carga (K): <span id="val-k">4500</span> g</label>
+                <label>Capacidad Carga (K): <span><span id="val-k">4500</span> g</span></label>
                 <input type="range" id="param-k" min="500" max="8000" step="100" value="4500">
             </div>
             <div class="slider-row">
-                <label>☀️ Luz Solar: <span id="val-luz">85</span>%</label>
-                <input type="range" id="param-luz" min="10" max="100" step="1" value="85">
+                <label>☀️ Radiación (% pleno sol): <span><span id="val-luz">65</span>%</span></label>
+                <input type="range" id="param-luz" min="0" max="100" step="1" value="65">
+                <small id="rango-luz" class="rango"></small>
             </div>
             <div class="slider-row">
-                <label>💧 Agua / Humedad: <span id="val-agua">45</span>%</label>
-                <input type="range" id="param-agua" min="5" max="100" step="1" value="45">
+                <label>💧 Agua aprovechable del suelo: <span><span id="val-agua">48</span>%</span></label>
+                <input type="range" id="param-agua" min="0" max="100" step="1" value="48">
+                <small id="rango-agua" class="rango"></small>
             </div>
             <div class="slider-row">
-                <label>🌡️ Temperatura: <span id="val-temp">26</span> °C</label>
-                <input type="range" id="param-temp" min="5" max="45" step="0.5" value="26">
+                <label>🌡️ Temperatura media: <span><span id="val-temp">22</span> °C</span></label>
+                <input type="range" id="param-temp" min="-5" max="45" step="0.5" value="22">
+                <small id="rango-temp" class="rango"></small>
             </div>
             <div class="slider-row">
-                <label>🧪 Nutrientes (NPK): <span id="val-nut">75</span>%</label>
-                <input type="range" id="param-nut" min="10" max="100" step="1" value="75">
+                <label>❄️ Mínima extrema del año: <span><span id="val-tmin">6</span> °C</span></label>
+                <input type="range" id="param-tmin" min="-15" max="20" step="0.5" value="6">
+                <small id="rango-tmin" class="rango"></small>
             </div>
             <div class="slider-row">
-                <label>🫧 CO₂ Atmosférico: <span id="val-co2">420</span> ppm</label>
-                <input type="range" id="param-co2" min="250" max="800" step="10" value="420">
+                <label>🧪 Nutrientes (índice NPK): <span><span id="val-nut">63</span>%</span></label>
+                <input type="range" id="param-nut" min="0" max="100" step="1" value="63">
+                <small id="rango-nut" class="rango"></small>
             </div>
             <div class="slider-row">
-                <label>⏩ Velocidad Simulación: <span id="val-speed">1.5</span>x</label>
+                <label>🪨 pH del suelo: <span id="val-ph">6.8</span></label>
+                <input type="range" id="param-ph" min="3.5" max="10" step="0.1" value="6.8">
+                <small id="rango-ph" class="rango"></small>
+            </div>
+            <div class="slider-row">
+                <label>🫧 CO₂ Atmosférico: <span><span id="val-co2">425</span> ppm</span></label>
+                <input type="range" id="param-co2" min="150" max="1200" step="10" value="425">
+                <small id="rango-co2" class="rango"></small>
+            </div>
+            <div class="slider-row">
+                <label>⏩ Velocidad Simulación: <span><span id="val-speed">1.5</span>x</span></label>
                 <input type="range" id="growth-speed" min="0.2" max="5" step="0.1" value="1.5">
             </div>
         </div>
 
-        <!-- ESCENARIO A/B PARALELO -->
         <div class="control-section ab-box">
             <div class="ab-header">
-                <label><input type="checkbox" id="toggle-ab"> ⚖️ Activar Comparativa A/B (Fila A vs Fila B)</label>
+                <label><input type="checkbox" id="toggle-ab"> ⚖️ Comparativa A/B (Fila A vs Fila B)</label>
             </div>
             <div id="ab-controls" class="hidden">
                 <label for="species-b-select">Especie Escenario B (Fila Trasera):</label>
                 <select id="species-b-select"></select>
-
-                <label for="model-b-select">Modelo Escenario B (Fila Trasera):</label>
+                <label for="model-b-select">Modelo Escenario B:</label>
                 <select id="model-b-select">
                     <option value="gompertz">Gompertz</option>
                     <option value="logistico">Logístico de Verhulst</option>
                     <option value="exponencial">Exponencial</option>
                     <option value="lineal">Lineal</option>
                 </select>
-                <div class="slider-row">
-                    <label>💧 Agua Escenario B: <span id="val-agua-b">22</span>%</label>
-                    <input type="range" id="param-agua-b" min="5" max="100" step="1" value="22">
+                <div id="ab-manual">
+                    <div class="slider-row">
+                        <label>💧 Agua Escenario B: <span><span id="val-agua-b">22</span>%</span></label>
+                        <input type="range" id="param-agua-b" min="0" max="100" step="1" value="22">
+                    </div>
+                    <div class="slider-row">
+                        <label>🌡️ Temp Escenario B: <span><span id="val-temp-b">32</span> °C</span></label>
+                        <input type="range" id="param-temp-b" min="-5" max="45" step="0.5" value="32">
+                    </div>
                 </div>
-                <div class="slider-row">
-                    <label>🌡️ Temp Escenario B: <span id="val-temp-b">32</span> °C</label>
-                    <input type="range" id="param-temp-b" min="5" max="45" step="0.5" value="32">
-                </div>
+                <p id="ab-geo-nota" class="nota hidden">La Fila B usa el clima real (7 años) de la ubicación B del globo.</p>
             </div>
         </div>
 
@@ -105,42 +266,21 @@
             <button id="btn-pause-growth">⏸️ Pausar</button>
             <button id="btn-restart">🔄 Reiniciar</button>
             <button id="btn-save-sim" class="btn-primary">💾 Guardar en MySQL</button>
-            <button id="btn-reports" class="btn-accent">📊 Reportes / Historial</button>
             <button id="btn-export-csv" class="btn-secondary">📥 Exportar CSV</button>
             <button id="btn-export-pdf" class="btn-secondary">🖨️ Reporte PDF</button>
             <button id="btn-camera">Reiniciar Cámara</button>
-            <button id="btn-qa" class="btn-dark">Preguntas</button>
         </div>
     </aside>
 
-    <!-- PANEL DERECHO -->
-    <aside id="analytics-panel">
+    <aside id="analytics-panel" class="panel solo-parcela">
         <h2>📈 Tablero de KPIs Biológicos</h2>
         <div class="kpi-grid">
-            <div class="kpi-card">
-                <span class="kpi-label">Día Actual</span>
-                <strong id="kpi-day">0</strong>
-            </div>
-            <div class="kpi-card">
-                <span class="kpi-label">Altura (m)</span>
-                <strong id="kpi-height">0.00</strong>
-            </div>
-            <div class="kpi-card">
-                <span class="kpi-label">Biomasa (g)</span>
-                <strong id="kpi-biomass">0.0</strong>
-            </div>
-            <div class="kpi-card">
-                <span class="kpi-label">Hojas / Tallos</span>
-                <strong id="kpi-leaves">0 / 1</strong>
-            </div>
-            <div class="kpi-card">
-                <span class="kpi-label">ICR (g/g·día)</span>
-                <strong id="kpi-icr">0.000</strong>
-            </div>
-            <div class="kpi-card">
-                <span class="kpi-label">Días a Cosecha</span>
-                <strong id="kpi-harvest">--</strong>
-            </div>
+            <div class="kpi-card"><span class="kpi-label">Día Actual</span><strong id="kpi-day">0</strong></div>
+            <div class="kpi-card"><span class="kpi-label">Altura (m)</span><strong id="kpi-height">0.00</strong></div>
+            <div class="kpi-card"><span class="kpi-label">Biomasa (g)</span><strong id="kpi-biomass">0.0</strong></div>
+            <div class="kpi-card"><span class="kpi-label">Hojas / Tallos</span><strong id="kpi-leaves">0 / 1</strong></div>
+            <div class="kpi-card"><span class="kpi-label">ICR (g/g·día)</span><strong id="kpi-icr">0.000</strong></div>
+            <div class="kpi-card"><span class="kpi-label">Días a Cosecha</span><strong id="kpi-harvest">--</strong></div>
         </div>
 
         <div class="stress-section">
@@ -153,9 +293,14 @@
                 <div class="progress-bar"><div id="bar-s-temp" class="progress-fill"></div></div>
             </div>
             <div class="stress-row">
-                <span>Estrés Global: <b id="lbl-s-global">0%</b></span>
+                <span>Estrés Global (Liebig): <b id="lbl-s-global">0%</b></span>
                 <div class="progress-bar"><div id="bar-s-global" class="progress-fill"></div></div>
             </div>
+            <div class="stress-row">
+                <span>Daño fisiológico acumulado: <b id="lbl-s-damage">0%</b></span>
+                <div class="progress-bar"><div id="bar-s-damage" class="progress-fill"></div></div>
+            </div>
+            <p id="lbl-estado" class="estado-planta estado-saludable">Saludable</p>
         </div>
 
         <div id="decision-box" class="decision-ok">
@@ -170,41 +315,36 @@
 
         <div id="model-explanation-box">
             <h4 id="model-exp-title">📐 Modelo Logístico de Verhulst</h4>
-            <p id="model-exp-desc">Crecimiento sigmoidal (curva en S) limitado por la capacidad de carga (K). Inicia lento en brote, acelera en fase juvenil y se desacelera al madurar la piña por competencia de recursos.</p>
+            <p id="model-exp-desc"></p>
         </div>
     </aside>
 
-    <!-- LÍNEA DEL TIEMPO DE 7 AÑOS (PARTE INFERIOR CENTRAL) -->
-    <div id="timeline-bar">
+    <div id="timeline-bar" class="solo-parcela">
         <div class="timeline-header">
             <div>
-                <span class="timeline-title">⏳ Línea del Tiempo Agronómica (Ciclo Real Agave: 7 Años)</span>
+                <span class="timeline-title">⏳ Línea del Tiempo (Ciclo Agave: 7 Años)</span>
                 <span id="timeline-current-year" class="badge badge-ok">En curso: Año 1</span>
             </div>
-            <span id="timeline-edit-status" class="timeline-hint">💡 Haz clic en una línea anual para editar o ver su clima guardado</span>
+            <span id="timeline-edit-status" class="timeline-hint">💡 Haz clic en una línea anual para editar o ver su clima</span>
         </div>
-
         <div class="timeline-track-wrapper">
-            <div class="timeline-progress-bg">
-                <div id="timeline-progress-fill"></div>
-            </div>
+            <div class="timeline-progress-bg"><div id="timeline-progress-fill"></div></div>
             <div id="timeline-nodes" class="timeline-nodes"></div>
         </div>
-
         <div id="timeline-node-details" class="timeline-details">
-            <span id="tl-detail-text">Selecciona una línea del Año 1 al 7 para ajustar sus variables climáticas (☀️ Luz, 💧 Agua, 🌡️ Temp, 🧪 NPK, 🫧 CO₂) con los sliders de la izquierda.</span>
+            <span id="tl-detail-text">Selecciona un año para ajustar su clima con los sliders de la izquierda.</span>
             <button id="btn-tl-live" class="btn-small hidden">🔓 Volver a Modo en Vivo</button>
         </div>
     </div>
 
-    <!-- PANEL DE INFORMACIÓN RAYCASTING -->
-    <div id="info-panel" class="hidden">
+    <div id="info-panel" class="hidden solo-parcela">
         <h2 id="info-name">Parte Seleccionada</h2>
         <div class="info-body">
             <p><strong>Especie:</strong> <span id="info-species">---</span></p>
             <p><strong>Geometría:</strong> <span id="info-type">---</span></p>
             <p><strong>Crecimiento actual:</strong> <span id="info-growth">0</span>%</p>
             <p><strong>Estrés asociado:</strong> <span id="info-stress">0</span>%</p>
+            <p><strong>Daño acumulado:</strong> <span id="info-damage">0</span></p>
             <p><strong>Contribución a Biomasa:</strong> <span id="info-biomass-part">0</span> g (<span id="info-biomass-pct">0</span>%)</p>
             <p><strong>Estado Quiote:</strong> <span id="info-quiote-status">En desarrollo</span></p>
             <p><strong>Descripción:</strong> <span id="info-desc">---</span></p>
@@ -212,137 +352,106 @@
         </div>
     </div>
 
-    <!-- MODAL DE GUARDADO EN MYSQL -->
+    <!-- ===================== MODALES ===================== -->
     <div id="save-modal" class="modal-overlay hidden">
         <div class="modal-card" style="max-width: 480px;">
             <button class="btn-close" id="btn-close-save">✖</button>
             <h2>💾 Guardar Simulación en MySQL</h2>
             <div class="form-group">
                 <label>Nombre del Experimento:</label>
-                <input type="text" id="sim-name" placeholder="Ej. Ensayo Logístico Agave Azul Altos">
+                <input type="text" id="sim-name" placeholder="Ej. Agave azul en Tequila con clima 2019-2025">
             </div>
             <div class="form-group">
                 <label>Notas Agronómicas / Observaciones:</label>
-                <textarea id="sim-notes" rows="3" placeholder="Anota conclusiones sobre el rendimiento o estrés observado..."></textarea>
+                <textarea id="sim-notes" rows="3" placeholder="Conclusiones sobre el rendimiento o estrés observado..."></textarea>
             </div>
+            <p class="nota">Si la simulación viene del globo, también se guarda el análisis geoespacial (ubicación, datos reales, idoneidad y decisiones) vinculado a ella.</p>
             <button id="btn-confirm-save" class="btn-primary" style="width:100%; margin-top:10px;">Guardar Registro en Base de Datos</button>
         </div>
     </div>
 
-    <!-- MODAL DE REPORTES -->
+    <div id="ab-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <button class="btn-close" id="btn-close-ab">✖</button>
+            <h2 id="ab-titulo">⚖️ Comparación A/B</h2>
+            <div class="modal-scroll" id="ab-contenido"></div>
+            <button id="btn-ab-simular" class="btn-primary" style="margin-top:12px;">▶️ Simular A (fila frontal) vs B (fila trasera) en la parcela 3D</button>
+        </div>
+    </div>
+
+    <div id="ranking-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <button class="btn-close" id="btn-close-ranking">✖</button>
+            <h2>🏆 Ranking de idoneidad (datos reales)</h2>
+            <div class="ranking-controles">
+                <label for="ranking-especie">Especie:</label>
+                <select id="ranking-especie"></select>
+                <span id="ranking-progreso" class="nota"></span>
+            </div>
+            <div class="modal-scroll">
+                <table class="data-table" id="ranking-tabla">
+                    <thead><tr><th>#</th><th>Ubicación</th><th>Especie</th><th>Idoneidad</th><th>Simulación 7 años</th><th>GBIF</th><th>Factor limitante</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <p class="nota">Índice = 25% temperatura + 25% agua + 10% luz + 10% nutrientes + 10% pH + 20% evidencia GBIF, penalizado por heladas; tope 35 si hay una variable en zona crítica y 10 si hay una en zona letal. Clic en una fila para verla en el globo.</p>
+            </div>
+        </div>
+    </div>
+
     <div id="reports-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="btn-close" id="btn-close-reports">✖</button>
             <h2>📊 Reportes Analíticos e Historial MySQL</h2>
             <div class="modal-scroll">
                 <div class="report-summary" id="report-kpis"></div>
-
-                <h3>🏆 Top 5 Simulaciones por Biomasa Acumulada</h3>
+                <h3>🏆 Top 5 Simulaciones por Biomasa</h3>
                 <table class="data-table" id="table-top5">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Experimento</th>
-                            <th>Especie</th>
-                            <th>Modelo</th>
-                            <th>Biomasa (g)</th>
-                            <th>Altura (m)</th>
-                            <th>Estrés (%)</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>ID</th><th>Experimento</th><th>Especie</th><th>Ubicación</th><th>Modelo</th><th>Biomasa</th><th>Estado</th><th>Estrés</th></tr></thead>
                     <tbody></tbody>
                 </table>
-
-                <h3>🌿 Eficiencia por Especie y Tiempo Promedio a Madurez</h3>
+                <h3>🌍 Mejores sitios analizados (idoneidad)</h3>
+                <table class="data-table" id="table-sitios">
+                    <thead><tr><th>Ubicación</th><th>Especie</th><th>Idoneidad</th><th>GBIF</th><th>Fecha</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <h3>🌿 Eficiencia por Especie</h3>
                 <table class="data-table" id="table-efficiency">
-                    <thead>
-                        <tr>
-                            <th>Especie</th>
-                            <th>Corridas</th>
-                            <th>Biomasa Promedio (g)</th>
-                            <th>Eficiencia (g/día)</th>
-                            <th>Tiempo Promedio Madurez</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Especie</th><th>Corridas</th><th>Biomasa Prom.</th><th>Eficiencia</th><th>Madurez Prom.</th><th>Muertes</th></tr></thead>
                     <tbody></tbody>
                 </table>
-
-                <h3>🕒 Historial de Simulaciones (Cargar y Reproducir)</h3>
+                <h3>🕒 Historial (Cargar y Reproducir)</h3>
                 <table class="data-table" id="table-history">
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Nombre</th>
-                            <th>Especie</th>
-                            <th>Modelo</th>
-                            <th>Biomasa</th>
-                            <th>Acción</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th>Fecha</th><th>Nombre</th><th>Especie</th><th>Ubicación</th><th>Modelo</th><th>Biomasa</th><th>Acción</th></tr></thead>
                     <tbody></tbody>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- MODAL DEL CUESTIONARIO -->
     <div id="qa-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <button class="btn-close" id="btn-close-qa">✖</button>
-            <h2>Preguntas</h2>
-            <div class="modal-scroll qa-scroll">
-                <h3>1. ¿Qué modelo ecológico o botánico representa tu simulador y por qué es relevante en bioinformática?</h3>
-                <p>Representa un Laboratorio Bioinformático de Cultivo enfocado en el género <i>Agave</i> (<i>A. tequilana</i>, <i>A. angustifolia</i>, <i>A. salmiana</i>) y organismos de referencia como <i>Arabidopsis thaliana</i>. Es relevante en bioinformática y biología computacional porque permite modelar in silico la interacción genotipo-ambiente (parámetros intrínsecos <i>r</i> y <i>K</i> frente a variables climáticas), predecir acumulación de biomasa de inulina y anticipar estrés fisiológico sin esperar los 7 años que toma un ensayo real en campo.</p>
-
-                <h3>2. ¿Cómo diseñaste el esquema de la base de datos MySQL? Explica la función de cada tabla y las relaciones.</h3>
-                <p>Se diseñó la base <code>practica05_bioinformatica</code> en tercera forma normal con 4 tablas relacionales InnoDB:
-                1) <code>especies</code>: catálogo maestro con parámetros óptimos de temperatura, agua, luz, NPK, CO₂, tasa <i>r</i> y capacidad <i>K</i>.
-                2) <code>simulaciones</code>: almacena la configuración y KPIs finales de cada corrida, relacionada muchos-a-uno (FK <code>especie_id</code>) con <code>especies</code>.
-                3) <code>mediciones</code>: serie temporal que registra cada N ticks la altura, biomasa, hojas, ICR y estrés (FK <code>simulacion_id</code>).
-                4) <code>decisiones</code>: bitácora de auditoría con las alertas y recomendaciones emitidas por el motor (FK <code>simulacion_id</code>).</p>
-
-                <h3>3. ¿Cómo implementaste la API REST con FlightPHP? Menciona al menos 3 rutas y su propósito.</h3>
-                <p>Se implementó en <code>api/index.php</code> utilizando el enrutador declarativo de FlightPHP (<code>Flight::route</code> y <code>Flight::json</code>). Sus rutas principales son:
-                • <code>GET /especies</code>: consulta y retorna en JSON el catálogo biológico para poblar el selector del frontend.
-                • <code>POST /simulaciones</code>: recibe el payload JSON de la corrida y ejecuta una transacción PDO que inserta la simulación, sus mediciones por tick y las decisiones asociadas.
-                • <code>GET /reportes</code>: ejecuta consultas agregadas (<code>AVG</code>, <code>MAX</code>, <code>GROUP BY</code>) para obtener el Top 5 por biomasa, la especie más eficiente y el tiempo promedio a madurez.</p>
-
-                <h3>4. ¿Cómo conectaste Three.js con MySQL a través de PHP? Describe el flujo frontend → fetch → FlightPHP → PDO → MySQL → JSON → frontend.</h3>
-                <p>El ciclo inicia en <code>main.js</code> invocando funciones asíncronas con <code>fetch()</code> y <code>async/await</code>. La petición HTTP llega a <code>api/index.php</code> donde FlightPHP identifica la ruta y el verbo HTTP. El controlador invoca la clase <code>Database::getConnection()</code> que usa <code>PDO</code> para ejecutar sentencias preparadas sobre MySQL. MySQL devuelve las filas, FlightPHP las serializa con <code>Flight::json()</code> y el frontend recibe el JSON para actualizar la geometría 3D en Three.js, las tablas y las gráficas de Chart.js.</p>
-
-                <h3>5. ¿Qué modelo matemático de crecimiento usaste (lineal, exponencial, logístico, Gompertz) y cómo lo traduciste a código y a la escala visual de la planta?</h3>
-                <p>Se implementaron los 4 modelos seleccionables en tiempo real mediante integración paso a paso a lo largo de la línea del tiempo de 7 años, destacando el Logístico de Verhulst <code>dN/dt = r·N(1 - N/K)</code> y Gompertz. En código, la biomasa calculada <code>N(t)</code> se normaliza dividiéndola entre la capacidad de carga <code>K</code> (fracción <code>f = N(t)/K</code> de 0.001 a 1.0). Esa fracción controla la propiedad <code>.scale</code> de la piña, el grupo de pencas y el quiote en Three.js.</p>
-
-                <h3>6. ¿Cómo calculaste los índices de estrés y cómo afectan al crecimiento simulado?</h3>
-                <p>Cada índice de estrés (hídrico, térmico, lumínico y nutricional) se calcula midiendo la desviación absoluta entre el valor actual del año en la línea del tiempo y el valor óptimo de la especie en MySQL, normalizado de 0 a 100. El estrés global pondera estos factores y penaliza la tasa efectiva <code>r_ef</code>. Si el estrés supera umbrales letales (ej. agua ≤ 8% o estrés global ≥ 78%), la planta entra en Punto de Marchitez Permanente (muerte irreversible), perdiendo biomasa y tiñéndose de color café seco.</p>
-
-                <h3>7. ¿En qué consiste tu motor de decisiones? Da un ejemplo de regla, su umbral y la recomendación que emite.</h3>
-                <p>Es un sistema basado en reglas heurísticas que evalúa en cada tick los indicadores fisiológicos. Ejemplo de regla: Si el <code>estresHidrico > 35%</code> (con agua por debajo del óptimo de la especie), el motor activa una alerta roja ("Déficit Hídrico Crítico"), emite la recomendación <i>"Aumentar riego para evitar cierre estomático y muerte por desecación"</i> y la registra para persistencia en la tabla <code>decisiones</code>.</p>
-
-                <h3>8. ¿Cómo implementaste la comparación A/B y qué métricas usaste para declarar un "ganador"?</h3>
-                <p>Al activar el modo A/B, el cultivo 3D se divide en dos parcelas: la Fila Frontal (Agaves 1-3) corre el Escenario A y la Fila Trasera (Agaves 4-6) corre el Escenario B en paralelo (permitiendo elegir tanto otra especie como otro modelo y clima). Se evalúa mayor Biomasa Acumulada (g) y menor Índice de Estrés Global (%), declarando en vivo en el panel y en Chart.js qué configuración agronómica es la ganadora.</p>
-
-                <h3>9. ¿Qué gráficas generaste y para qué sirven en el análisis? (Chart.js, CSV, PDF).</h3>
-                <p>Con Chart.js se generó un gráfico dinámico multivariable que traza la curva de Biomasa del Escenario A, la curva del Escenario B y la evolución del Estrés Global a lo largo de los 7 años (2,555 días). Además, se incluyó exportación directa de la serie temporal a archivo <code>.CSV</code> y generación de reporte imprimible en <code>PDF</code>.</p>
-
-                <h3>10. ¿Cómo evitaste SQL Injection y qué otras medidas de seguridad aplicaste en la API?</h3>
-                <p>Se utilizó exclusivamente PDO con sentencias preparadas nativas (<code>PDO::ATTR_EMULATE_PREPARES => false</code>) y parámetros vinculados (<code>?</code>), impidiendo que entradas maliciosas alteren la sintaxis SQL. Adicionalmente, se sanitizaron cadenas con <code>strip_tags()</code> y <code>htmlspecialchars()</code>, se validaron enteros con <code>filter_var()</code> y se manejaron transacciones atómicas (<code>beginTransaction / rollBack</code>).</p>
-
-                <h3>11. ¿Qué parte del proyecto fue la más difícil y cómo la resolviste?</h3>
-                <p>Sincronizar el bucle de 60 FPS de Three.js con la línea del tiempo de 7 años y el registro de datos sin saturar MySQL ni causar saltos abruptos al cambiar el clima. Se resolvió integrando las ecuaciones diferenciales paso a paso por año y almacenando mediciones cada 5 ticks en un arreglo en memoria que se envía en una sola transacción <code>POST</code> al guardar.</p>
-
-                <h3>12. ¿Qué decisiones agronómicas o biológicas concretas puede apoyar tu simulador?</h3>
-                <p>Permite decidir qué especie de agave sembrar según el clima local, determinar el momento exacto de riego en cada año del ciclo, ejecutar el desquiote (corte del quiote floral) en plantas individuales para engordar la piña (+12% biomasa) y estimar cuántos días reales faltan para la jima.</p>
-
-                <h3>13. Si tuvieras que llevar este proyecto a un sistema real de investigación, ¿qué agregarías?</h3>
-                <p>Integraría sensores IoT en campo (humedad capacitiva de suelo, estaciones meteorológicas MQTT) para alimentar la API en tiempo real, datos de secuenciación transcriptómica (RNA-seq) para correlacionar expresión de genes de estrés con las curvas de Gompertz, y controladores PID automatizados para electroválvulas de riego por goteo.</p>
-
-                <h3>14. ¿Cómo escalarías la aplicación para manejar cientos de simulaciones y usuarios concurrentes?</h3>
-                <p>Agregando índices compuestos en MySQL (como <code>idx_sim_tick</code> ya incluido en <code>mediciones</code>), implementando caché en memoria con Redis para el catálogo y reportes frecuentes, colas de mensajes (RabbitMQ) para procesar inserciones masivas de telemetría en segundo plano y paginación en los endpoints de la API.</p>
+            <h2>Preguntas — Práctica 06</h2>
+            <div class="modal-scroll qa-scroll" id="qa-contenido">
+                <p>Cargando respuestas desde <code>docs/RESPUESTAS.md</code>…</p>
             </div>
         </div>
     </div>
 
-    <script type="module" src="main.js?v=3"></script>
+    <script>
+        // Las respuestas viven en un solo archivo Markdown (docs/RESPUESTAS.md) y se renderizan aquí
+        document.querySelectorAll('.btn-qa-open').forEach(b => b.addEventListener('click', async () => {
+            const cont = document.getElementById('qa-contenido');
+            if (cont.dataset.cargado) return;
+            try {
+                const md = await (await fetch('docs/RESPUESTAS.md')).text();
+                cont.innerHTML = window.marked ? marked.parse(md) : `<pre>${md.replace(/</g, '&lt;')}</pre>`;
+                cont.dataset.cargado = '1';
+            } catch (e) {
+                cont.innerHTML = '<p>No se pudo cargar docs/RESPUESTAS.md</p>';
+            }
+        }));
+    </script>
+    <script type="module" src="main.js?v=6"></script>
 </body>
 </html>
