@@ -93,3 +93,4 @@ Se requiere conexión a internet: las APIs se consultan en vivo la primera vez y
 
 - [docs/investigacion_metricas_agave.md](docs/investigacion_metricas_agave.md): métricas ambientales, zonas de favorable a letal, modelo de daño y recuperación, y referencias.
 - [docs/RESPUESTAS.md](docs/RESPUESTAS.md): respuestas a las preguntas de la práctica (también en el botón "❓ Preguntas" de la app).
+- [docs/VERIFICACION_APIS.md](docs/VERIFICACION_APIS.md): origen de las ubicaciones por defecto y de cada dato de la página, con las URLs para comparar nuestra API contra la API original.
